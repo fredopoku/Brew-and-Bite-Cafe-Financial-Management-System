@@ -1,0 +1,7 @@
+[Brew and Bite Café Financial Management System]
+name = "python-template"
+version = "0.1.0"
+description = "A database-driven application for managing expenses, inventory, and sales—designed for small businesses. This repository contains the implementation of a robust expense tracking and inventory management system created for Brew and Bite Café. The application leverages a multi-tier architecture to provide a secure, efficient, and user-friendly solution tailored for small business owners to optimize financial decision-making."
+author = ["Frederick Opoku Afriyie <opokufred32@gmail.com>"]
+requires-python = ">=3.11"
+dependencies = []
