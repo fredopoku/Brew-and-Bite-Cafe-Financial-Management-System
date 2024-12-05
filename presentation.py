@@ -1,29 +1,65 @@
 import tkinter as tk
 from tkinter import messagebox, simpledialog
-from business_logic import register_user, authenticate_user, record_expense, add_inventory_item, record_sale, generate_expense_report, generate_inventory_report, generate_sales_report
+from business_logic import (
+    register_user, authenticate_user, record_expense,
+    add_inventory_item, record_sale, generate_expense_report,
+    generate_inventory_report, generate_sales_report
+)
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine
+from models import User, Expense, Inventory, Sale, SaleItem, Category  # Import your ORM models
+
+# Set up the database connection
+engine = create_engine('sqlite:///brew_and_bite.db')
+Session = sessionmaker(bind=engine)
+session = Session()
+
 
 # Function to display a message box with a title and message
 def show_message(title, message):
     messagebox.showinfo(title, message)
 
+
+# Utility function to validate that a string is a valid float
+def validate_float(value, field_name):
+    try:
+        return float(value)
+    except ValueError:
+        show_message("Error", f"Invalid value for {field_name}. Please enter a valid number.")
+        return None
+
+
 # GUI function to handle user registration
 def register_user_gui():
     def register():
-        # Retrieve input data from user
         username = entry_username.get()
         password = entry_password.get()
         email = entry_email.get()
-        # Call business logic to register the user
-        register_user(username, password, email)
-        # Notify the user of success and close the window
-        show_message("Success", "User registered successfully!")
-        register_window.destroy()
 
-    # Create a new top-level window for user registration
+        if not username or not password or not email:
+            show_message("Error", "All fields must be filled.")
+            return
+
+        # Check if email already exists
+        existing_user = session.query(User).filter(User.email == email).first()
+        if existing_user:
+            show_message("Error", "Email is already registered. Please use a different email.")
+            return
+
+        # Insert user into the database
+        new_user = User(username=username, password_hash=password, email=email)
+        session.add(new_user)
+        try:
+            session.commit()
+            show_message("Success", "User registered successfully!")
+            register_window.destroy()
+        except Exception as e:
+            session.rollback()
+            show_message("Error", f"An error occurred while registering the user: {str(e)}")
+
     register_window = tk.Toplevel(root)
     register_window.title("Register User")
 
-    # Create input fields for username, password, and email
     tk.Label(register_window, text="Username:").pack()
     entry_username = tk.Entry(register_window)
     entry_username.pack()
@@ -36,29 +72,38 @@ def register_user_gui():
     entry_email = tk.Entry(register_window)
     entry_email.pack()
 
-    # Button to trigger the registration process
     tk.Button(register_window, text="Register", command=register).pack()
+
 
 # GUI function to handle recording an expense
 def record_expense_gui():
     def record_expense():
-        # Retrieve input data from the user
-        user_id = int(entry_user_id.get())
-        category_id = int(entry_category_id.get())
+        user_id = entry_user_id.get()
+        category_id = entry_category_id.get()
         date = entry_date.get()
-        amount = float(entry_amount.get())
+        amount = validate_float(entry_amount.get(), "Amount")
         description = entry_description.get()
-        # Call business logic to record the expense
-        record_expense(user_id, category_id, date, amount, description)
-        # Notify the user of success and close the window
-        show_message("Success", "Expense recorded successfully!")
-        expense_window.destroy()
 
-    # Create a new top-level window for recording expenses
+        if not user_id or not category_id or not date or not description:
+            show_message("Error", "All fields must be filled.")
+            return
+        if amount is None:
+            return
+
+        # Insert expense into the database
+        new_expense = Expense(user_id=int(user_id), category_id=int(category_id), date=date, amount=amount, description=description)
+        session.add(new_expense)
+        try:
+            session.commit()
+            show_message("Success", "Expense recorded successfully!")
+            expense_window.destroy()
+        except Exception as e:
+            session.rollback()
+            show_message("Error", f"An error occurred while recording the expense: {str(e)}")
+
     expense_window = tk.Toplevel(root)
     expense_window.title("Record Expense")
 
-    # Create input fields for expense details
     tk.Label(expense_window, text="User ID:").pack()
     entry_user_id = tk.Entry(expense_window)
     entry_user_id.pack()
@@ -79,27 +124,34 @@ def record_expense_gui():
     entry_description = tk.Entry(expense_window)
     entry_description.pack()
 
-    # Button to trigger the expense recording process
     tk.Button(expense_window, text="Record", command=record_expense).pack()
+
 
 # GUI function to handle adding an inventory item
 def add_inventory_item_gui():
     def add_item():
-        # Retrieve input data from the user
         item_name = entry_item_name.get()
-        quantity = int(entry_quantity.get())
-        cost = float(entry_cost.get())
-        # Call business logic to add the inventory item
-        add_inventory_item(item_name, quantity, cost)
-        # Notify the user of success and close the window
-        show_message("Success", "Inventory item added successfully!")
-        inventory_window.destroy()
+        quantity = entry_quantity.get()
+        cost = validate_float(entry_cost.get(), "Cost")
 
-    # Create a new top-level window for adding inventory items
+        if not item_name or not quantity or cost is None:
+            show_message("Error", "All fields must be filled and Cost must be a valid number.")
+            return
+
+        # Insert inventory item into the database
+        new_item = Inventory(item_name=item_name, quantity=int(quantity), cost=cost)
+        session.add(new_item)
+        try:
+            session.commit()
+            show_message("Success", "Inventory item added successfully!")
+            inventory_window.destroy()
+        except Exception as e:
+            session.rollback()
+            show_message("Error", f"An error occurred while adding the inventory item: {str(e)}")
+
     inventory_window = tk.Toplevel(root)
     inventory_window.title("Add Inventory Item")
 
-    # Create input fields for inventory item details
     tk.Label(inventory_window, text="Item Name:").pack()
     entry_item_name = tk.Entry(inventory_window)
     entry_item_name.pack()
@@ -112,29 +164,45 @@ def add_inventory_item_gui():
     entry_cost = tk.Entry(inventory_window)
     entry_cost.pack()
 
-    # Button to trigger the inventory item addition process
     tk.Button(inventory_window, text="Add", command=add_item).pack()
+
 
 # GUI function to handle recording a sale
 def record_sale_gui():
     def record_sale():
-        # Retrieve input data from the user
-        user_id = int(entry_user_id.get())
+        user_id = entry_user_id.get()
         date = entry_date.get()
-        amount = float(entry_amount.get())
-        # Use eval to parse the input for items sold (dictionary format)
-        items_sold = eval(entry_items_sold.get())  # Format: {item_id: quantity_sold}
-        # Call business logic to record the sale
-        record_sale(user_id, date, amount, items_sold)
-        # Notify the user of success and close the window
-        show_message("Success", "Sale recorded successfully!")
-        sale_window.destroy()
+        amount = validate_float(entry_amount.get(), "Amount")
+        items_sold = entry_items_sold.get()
 
-    # Create a new top-level window for recording sales
+        if not user_id or not date or not items_sold or amount is None:
+            show_message("Error", "All fields must be filled and Amount must be a valid number.")
+            return
+
+        # Convert string to dictionary
+        items_sold_dict = eval(items_sold)  # Format: {item_id: quantity_sold}
+
+        # Insert sale into the database
+        new_sale = Sale(user_id=int(user_id), date=date, amount=amount)
+        session.add(new_sale)
+        try:
+            session.commit()
+
+            # Record the sale items
+            for item_id, quantity_sold in items_sold_dict.items():
+                new_sale_item = SaleItem(sale_id=new_sale.sale_id, item_id=item_id, quantity_sold=quantity_sold)
+                session.add(new_sale_item)
+            session.commit()
+
+            show_message("Success", "Sale recorded successfully!")
+            sale_window.destroy()
+        except Exception as e:
+            session.rollback()
+            show_message("Error", f"An error occurred while recording the sale: {str(e)}")
+
     sale_window = tk.Toplevel(root)
     sale_window.title("Record Sale")
 
-    # Create input fields for sale details
     tk.Label(sale_window, text="User ID:").pack()
     entry_user_id = tk.Entry(sale_window)
     entry_user_id.pack()
@@ -151,60 +219,76 @@ def record_sale_gui():
     entry_items_sold = tk.Entry(sale_window)
     entry_items_sold.pack()
 
-    # Button to trigger the sale recording process
     tk.Button(sale_window, text="Record", command=record_sale).pack()
+
 
 # GUI function to display the expense report
 def generate_expense_report_gui():
-    # Retrieve the expense report from business logic
-    report = generate_expense_report()
-    # Create a new top-level window to display the report
+    report = generate_expense_report(session)
     report_window = tk.Toplevel(root)
     report_window.title("Expense Report")
     text_widget = tk.Text(report_window)
     text_widget.pack()
-    # Populate the text widget with the report data
     for expense in report:
-        text_widget.insert(tk.END, f"Date: {expense['date']}, Amount: {expense['amount']}, Category: {expense['category']}, Description: {expense['description']}\n")
+        text_widget.insert(tk.END,
+                           f"Date: {expense.date}, Amount: {expense.amount}, Category: {expense.category.category_name}, Description: {expense.description}\n")
+
 
 # GUI function to display the inventory report
 def generate_inventory_report_gui():
-    # Retrieve the inventory report from business logic
-    report = generate_inventory_report()
-    # Create a new top-level window to display the report
+    report = generate_inventory_report(session)
     report_window = tk.Toplevel(root)
     report_window.title("Inventory Report")
     text_widget = tk.Text(report_window)
     text_widget.pack()
-    # Populate the text widget with the report data
     for item in report:
-        text_widget.insert(tk.END, f"Item Name: {item['item_name']}, Quantity: {item['quantity']}, Cost: {item['cost']}\n")
+        text_widget.insert(tk.END,
+                           f"Item Name: {item.item_name}, Quantity: {item.quantity}, Cost: {item.cost}\n")
+
 
 # GUI function to display the sales report
 def generate_sales_report_gui():
-    # Retrieve the sales report from business logic
-    report = generate_sales_report()
-    # Create a new top-level window to display the report
+    report = generate_sales_report(session)
     report_window = tk.Toplevel(root)
     report_window.title("Sales Report")
     text_widget = tk.Text(report_window)
     text_widget.pack()
-    # Populate the text widget with the report data
     for sale in report:
-        text_widget.insert(tk.END, f"Date: {sale['date']}, Amount: {sale['amount']}, Items Sold: {sale['items_sold']}\n")
+        text_widget.insert(tk.END,
+                           f"Date: {sale.date}, Amount: {sale.amount}, Items Sold: {sale.items_sold}\n")
+
 
 # Main application window
 root = tk.Tk()
 root.title("Brew and Bite Café Management System")
 
-# Buttons to access various functionalities
-tk.Button(root, text="Register User", command=register_user_gui).pack()
-tk.Button(root, text="Record Expense", command=record_expense_gui).pack()
-tk.Button(root, text="Add Inventory Item", command=add_inventory_item_gui).pack()
-tk.Button(root, text="Record Sale", command=record_sale_gui).pack()
-tk.Button(root, text="Generate Expense Report", command=generate_expense_report_gui).pack()
-tk.Button(root, text="Generate Inventory Report", command=generate_inventory_report_gui).pack()
-tk.Button(root, text="Generate Sales Report", command=generate_sales_report_gui).pack()
+# Button to open user registration
+register_button = tk.Button(root, text="Register User", command=register_user_gui)
+register_button.pack()
 
-# Run the main event loop for the application
+# Button to record an expense
+expense_button = tk.Button(root, text="Record Expense", command=record_expense_gui)
+expense_button.pack()
+
+# Button to add an inventory item
+inventory_button = tk.Button(root, text="Add Inventory Item", command=add_inventory_item_gui)
+inventory_button.pack()
+
+# Button to record a sale
+sale_button = tk.Button(root, text="Record Sale", command=record_sale_gui)
+sale_button.pack()
+
+# Button to generate an expense report
+expense_report_button = tk.Button(root, text="Generate Expense Report", command=generate_expense_report_gui)
+expense_report_button.pack()
+
+# Button to generate an inventory report
+inventory_report_button = tk.Button(root, text="Generate Inventory Report", command=generate_inventory_report_gui)
+inventory_report_button.pack()
+
+# Button to generate a sales report
+sales_report_button = tk.Button(root, text="Generate Sales Report", command=generate_sales_report_gui)
+sales_report_button.pack()
+
+# Start the application
 root.mainloop()
