@@ -1,12 +1,12 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.orm import scoped_session
+from sqlalchemy.orm import sessionmaker, scoped_session
 from contextlib import contextmanager
 import logging
 from datetime import datetime
+import os
 
 from src.config import DATABASE_URL
-from src.database.models import Base, User, Category, InventoryItem, UserRole
+from src.models import Base, User, Category, InventoryItem, UserRole
 from src.utils.security import hash_password
 
 logger = logging.getLogger(__name__)
@@ -36,26 +36,26 @@ def session_scope():
 
 def initialize_database():
     """Initialize the database with tables and default data."""
-    logger.info("Initializing database...")
-
     try:
+        # Setup data directory if it doesn't exist
+        os.makedirs('data', exist_ok=True)
+
+        logger.info("Initializing database...")
+
         # Create all tables
         Base.metadata.create_all(engine)
         logger.info("Database tables created successfully")
 
         with session_scope() as session:
-            # Check if admin user exists
+            # Create default admin user if not exists
             admin_exists = session.query(User).filter_by(username='admin').first()
-
             if not admin_exists:
-                # Create admin user
-                admin_password = hash_password('admin123')  # Change in production
+                admin_password = hash_password('admin123')
                 admin_user = User(
                     username='admin',
                     email='admin@brewandbite.com',
                     password_hash=admin_password,
-                    role=UserRole.ADMIN,
-                    created_at=datetime.utcnow()
+                    role=UserRole.ADMIN
                 )
                 session.add(admin_user)
                 logger.info("Admin user created successfully")
@@ -66,7 +66,7 @@ def initialize_database():
                 ('Beverages', 'expense', 'Coffee beans, tea, and other beverages'),
                 ('Utilities', 'expense', 'Electricity, water, gas, etc.'),
                 ('Salaries', 'expense', 'Employee wages and salaries'),
-                ('Equipment', 'expense', 'Kitchen and café equipment'),
+                ('Equipment', 'expense', 'Kitchen and cafe equipment'),
                 ('Marketing', 'expense', 'Advertising and promotions'),
                 ('Food Sales', 'income', 'Revenue from food items'),
                 ('Beverage Sales', 'income', 'Revenue from beverages')
@@ -75,10 +75,14 @@ def initialize_database():
             for name, type_, description in default_categories:
                 category_exists = session.query(Category).filter_by(name=name).first()
                 if not category_exists:
-                    category = Category(name=name, type=type_, description=description)
+                    category = Category(
+                        name=name,
+                        type=type_,
+                        description=description
+                    )
                     session.add(category)
 
-            # Add some initial inventory items
+            # Add default inventory items
             default_inventory = [
                 ('Coffee Beans (1kg)', 'Premium Arabica coffee beans', 50, 20.0, 10),
                 ('Milk (1L)', 'Fresh whole milk', 100, 2.5, 20),
@@ -95,12 +99,10 @@ def initialize_database():
                         description=desc,
                         quantity=qty,
                         unit_cost=cost,
-                        reorder_level=reorder,
-                        last_restocked=datetime.utcnow()
+                        reorder_level=reorder
                     )
                     session.add(item)
 
-            session.commit()
             logger.info("Default data created successfully")
 
     except Exception as e:
@@ -114,6 +116,9 @@ def get_session():
 def backup_database():
     """Create a backup of the database."""
     try:
+        # Create backups directory if it doesn't exist
+        os.makedirs('data/backups', exist_ok=True)
+
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         backup_path = f'data/backups/brew_and_bite_backup_{timestamp}.db'
 

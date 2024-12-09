@@ -1,14 +1,13 @@
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime, date
-import logging
+from datetime import datetime
 from decimal import Decimal
 from sqlalchemy.orm import Session
+
+from src import validate_amount, validate_quantity, validate_date
 from src.dal.sale_dao import SaleDAO
 from src.dal.inventory_dao import InventoryDAO
-from src.utils.validators import validate_amount, validate_quantity, validate_date
-from src.database.models import Sale, SaleItem
-
-logger = logging.getLogger(__name__)
+from src.database import Sale
+from src.utils import logger
 
 
 class SalesService:
@@ -170,7 +169,7 @@ class SalesService:
 
     def get_top_selling_items(self, start_date: str, end_date: str,
                               limit: int = 10) -> List[Dict]:
-        """Get top selling items for a date range"""
+        """Get top-selling items for a date range"""
         try:
             # Validate dates
             for date_str in [start_date, end_date]:

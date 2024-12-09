@@ -5,22 +5,20 @@ import logging
 from datetime import datetime, timedelta
 
 # Local imports
-from src.services.auth_service import AuthService
-from src.services.user_service import UserService
-from src.services.sales_service import SalesService
-from src.services.expense_service import ExpenseService
-from src.services.inventory_service import InventoryService
-from src.services.reporting_service import ReportingService
 from src.gui.dialogs import ChangePasswordDialog, UserManualDialog
 from src.database.models import UserRole
+from src.bll.service_provider import ServiceProvider
+
 
 logger = logging.getLogger(__name__)
 
 
 class MainWindow:
-    def __init__(self, user_data: Dict, auth_service: AuthService):
+    def __init__(self, user_data: Dict):
         self.user_data = user_data
-        self.auth_service = auth_service
+        self.service_provider = ServiceProvider.get_instance()
+        self.auth_service = self.service_provider.get_service('auth')
+        self.setup_window()
         self.last_activity = datetime.now()
 
         # Initialize main window

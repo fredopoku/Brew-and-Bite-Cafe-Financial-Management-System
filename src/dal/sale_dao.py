@@ -149,7 +149,7 @@ class SaleDAO:
             .group_by(Sale.payment_method) \
             .all()
 
-        # Get top selling items
+        # Get top-selling items
         top_items = self.session.query(
             InventoryItem.name,
             func.sum(SaleItem.quantity).label('quantity'),
