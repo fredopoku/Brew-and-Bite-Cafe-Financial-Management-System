@@ -183,6 +183,50 @@ class ExpenseService:
             logger.error(f"Failed to delete expense: {str(e)}")
             raise
 
+    def get_expenses(self, start_date: str, end_date: str,
+                     category_id: Optional[int] = None) -> List[Dict]:
+        """Return a flat list of expenses for the date range, formatted for the UI."""
+        try:
+            for date_str in [start_date, end_date]:
+                date_valid, date_error = validate_date(date_str)
+                if not date_valid:
+                    raise ValueError(date_error)
+
+            start = datetime.strptime(start_date, '%Y-%m-%d').date()
+            end = datetime.strptime(end_date, '%Y-%m-%d').date()
+
+            if category_id:
+                expenses = self.expense_dao.get_expenses_by_category(
+                    category_id, start, end
+                )
+            else:
+                expenses = self.expense_dao.get_expenses_by_date_range(start, end)
+
+            return [
+                {
+                    'id': e.id,
+                    'date': e.date.strftime('%Y-%m-%d'),
+                    'category': e.category.name if e.category else '',
+                    'amount': float(e.amount),
+                    'description': e.description or '',
+                    'user': e.user.username if e.user else '',
+                }
+                for e in expenses
+            ]
+
+        except Exception as e:
+            logger.error(f"Failed to get expenses: {str(e)}")
+            raise
+
+    def get_categories(self) -> List[Dict]:
+        """Return all expense categories."""
+        try:
+            cats = self.session.query(Category).filter_by(type='expense').all()
+            return [{'id': c.id, 'name': c.name, 'description': c.description} for c in cats]
+        except Exception as e:
+            logger.error(f"Failed to get categories: {str(e)}")
+            raise
+
     def get_category_breakdown(self, start_date: str, end_date: str) -> List[Dict]:
         """Get expense breakdown by category for a date range"""
         try:
