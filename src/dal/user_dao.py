@@ -11,8 +11,10 @@ class UserDAO:
         self.session = session
 
     @log_function_call
-    def create_user(self, username: str, email: str, password_hash: str, role: UserRole = UserRole.STAFF) -> User:
-        """Create a new user"""
+    def create_user(self, username: str, email: str, password_hash: str,
+                    role: UserRole = UserRole.STAFF,
+                    audit_user_id: int = None) -> User:
+        """Create a new user with an audit log entry."""
         user = User(
             username=username,
             email=email,
@@ -22,16 +24,19 @@ class UserDAO:
             created_at=datetime.utcnow()
         )
         self.session.add(user)
+        # Flush so user.id is assigned before we reference it in the audit log
+        self.session.flush()
 
-        # Add audit log
+        # Use the provided auditor's ID; fall back to the new user's own ID
+        effective_auditor = audit_user_id if audit_user_id is not None else user.id
         audit = AuditLog(
-            user_id=None,  # System action for new user creation
+            user_id=effective_auditor,
             action='CREATE',
             table_name='users',
+            record_id=user.id,
             details=f'Created new user: {username}'
         )
         self.session.add(audit)
-
         self.session.commit()
         return user
 

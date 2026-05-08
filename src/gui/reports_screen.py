@@ -5,8 +5,20 @@ import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-from brew_and_bite.services import ReportingService
-from brew_and_bite.gui.components import DatePicker
+try:
+    from src.gui.styles import (CREAM, CARD_BG, ESPRESSO, MEDIUM_BROWN, DARK_BROWN,
+                                 LIGHT_BROWN, BORDER, TEXT_DARK, TEXT_LIGHT, TEXT_MID,
+                                 SUCCESS, WARNING, DANGER, FONT_H2, FONT_H3,
+                                 FONT_BODY, FONT_SMALL)
+    _HAS_STYLES = True
+except ImportError:
+    _HAS_STYLES = False
+
+
+class DatePicker(ttk.Entry):
+    """Simple date entry widget (YYYY-MM-DD format)."""
+    def __init__(self, parent, textvariable=None, **kwargs):
+        super().__init__(parent, textvariable=textvariable, width=12, **kwargs)
 
 logger = logging.getLogger(__name__)
 
@@ -31,69 +43,58 @@ class ReportsScreen(ttk.Frame):
 
     def create_widgets(self):
         """Create and arrange widgets"""
-        # Main heading
-        heading_frame = ttk.Frame(self)
-        heading_frame.pack(fill="x", padx=10, pady=5)
+        bg = CREAM if _HAS_STYLES else "#f0f0f0"
 
-        ttk.Label(
-            heading_frame,
-            text="Reports",
-            font=("Helvetica", 16, "bold")
+        # Header bar
+        heading_frame = tk.Frame(self, bg=bg, pady=12)
+        heading_frame.pack(fill="x", padx=20)
+
+        tk.Label(
+            heading_frame, text="Reports & Analytics",
+            font=FONT_H2 if _HAS_STYLES else ("Helvetica", 16, "bold"),
+            bg=bg, fg=ESPRESSO if _HAS_STYLES else "black"
         ).pack(side="left")
 
-        # Controls frame
-        controls_frame = ttk.Frame(self)
-        controls_frame.pack(fill="x", padx=10, pady=5)
+        bg = CREAM if _HAS_STYLES else "#f0f0f0"
 
-        # Report type selection
-        ttk.Label(controls_frame, text="Report Type:").pack(side="left", padx=5)
+        # Controls bar
+        controls_frame = tk.Frame(self, bg=bg)
+        controls_frame.pack(fill="x", padx=20, pady=(0, 8))
+
+        tk.Label(controls_frame, text="Report:",
+                 font=FONT_SMALL if _HAS_STYLES else ("Helvetica", 10),
+                 bg=bg).pack(side="left", padx=(0, 4))
         report_types = ["Daily Sales", "Monthly Sales", "Product Performance"]
         report_combo = ttk.Combobox(
-            controls_frame,
-            textvariable=self.report_type_var,
-            values=report_types,
-            state="readonly",
-            width=20
+            controls_frame, textvariable=self.report_type_var,
+            values=report_types, state="readonly", width=22
         )
-        report_combo.pack(side="left", padx=5)
+        report_combo.pack(side="left", padx=(0, 14))
 
-        # Date range
-        date_frame = ttk.LabelFrame(controls_frame, text="Date Range")
-        date_frame.pack(side="left", padx=20)
+        tk.Label(controls_frame, text="From:",
+                 font=FONT_SMALL if _HAS_STYLES else ("Helvetica", 10),
+                 bg=bg).pack(side="left", padx=(0, 4))
+        DatePicker(controls_frame, self.start_date_var).pack(side="left", padx=(0, 8))
 
-        ttk.Label(date_frame, text="From:").pack(side="left", padx=5)
-        DatePicker(
-            date_frame,
-            self.start_date_var
-        ).pack(side="left", padx=5)
+        tk.Label(controls_frame, text="To:",
+                 font=FONT_SMALL if _HAS_STYLES else ("Helvetica", 10),
+                 bg=bg).pack(side="left", padx=(0, 4))
+        DatePicker(controls_frame, self.end_date_var).pack(side="left", padx=(0, 14))
 
-        ttk.Label(date_frame, text="To:").pack(side="left", padx=5)
-        DatePicker(
-            date_frame,
-            self.end_date_var
-        ).pack(side="left", padx=5)
+        ttk.Button(controls_frame, text="Generate",
+                   style="Primary.TButton" if _HAS_STYLES else "TButton",
+                   command=self.generate_report).pack(side="left", padx=(0, 6))
+        ttk.Button(controls_frame, text="Export PDF",
+                   style="Secondary.TButton" if _HAS_STYLES else "TButton",
+                   command=self.export_report).pack(side="left")
 
-        # Buttons
-        ttk.Button(
-            controls_frame,
-            text="Generate Report",
-            command=self.generate_report
-        ).pack(side="left", padx=5)
+        # Scrollable report display area
+        outer = tk.Frame(self, bg=bg)
+        outer.pack(fill="both", expand=True, padx=10, pady=5)
+        self.report_frame = ttk.Frame(outer)
+        self.report_frame.pack(fill="both", expand=True)
 
-        ttk.Button(
-            controls_frame,
-            text="Export",
-            command=self.export_report
-        ).pack(side="left", padx=5)
-
-        # Report display area
-        self.report_frame = ttk.Frame(self)
-        self.report_frame.pack(fill="both", expand=True, padx=10, pady=5)
-
-        # Pack main frame
         self.pack(fill="both", expand=True)
-
-        # Bind events
         report_combo.bind("<<ComboboxSelected>>", lambda e: self.generate_report())
 
     def load_initial_data(self):
@@ -323,22 +324,28 @@ class ReportsScreen(ttk.Frame):
 
     def export_report(self):
         """Export current report"""
+        _TYPE_MAP = {
+            "Daily Sales": "daily",
+            "Monthly Sales": "periodic",
+            "Product Performance": "periodic",
+        }
         try:
-            report_type = self.report_type_var.get().lower().replace(" ", "_")
+            selected = self.report_type_var.get()
+            report_type = _TYPE_MAP.get(selected, "periodic")
+            safe_name = selected.lower().replace(" ", "_")
 
-            # Generate report data
             report_data = self.services['reporting'].export_report(
                 report_type=report_type,
                 start_date=self.start_date_var.get(),
                 end_date=self.end_date_var.get(),
-                format='pdf'
+                format='csv'
             )
 
-            # Save file
-            filename = tk.filedialog.asksaveasfilename(
-                defaultextension=".pdf",
-                filetypes=[("PDF files", "*.pdf")],
-                initialfile=f"{report_type}_report_{datetime.now().strftime('%Y%m%d')}.pdf"
+            from tkinter import filedialog
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv")],
+                initialfile=f"{safe_name}_report_{datetime.now().strftime('%Y%m%d')}.csv"
             )
 
             if filename:

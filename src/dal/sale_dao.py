@@ -109,7 +109,10 @@ class SaleDAO:
                                 payment_method: Optional[str] = None) -> List[Sale]:
         """Get sales within a date range with optional filters"""
         query = self.session.query(Sale) \
-            .options(joinedload(Sale.sale_items)) \
+            .options(
+                joinedload(Sale.user),
+                joinedload(Sale.sale_items).joinedload(SaleItem.inventory_item)
+            ) \
             .filter(and_(
             func.date(Sale.date) >= start_date,
             func.date(Sale.date) <= end_date
@@ -296,6 +299,29 @@ class SaleDAO:
                 for cat in category_sales
             ]
         }
+
+    def get_top_selling_items(self, start_date: date, end_date: date,
+                              limit: int = 10) -> List[Dict]:
+        """Get top-selling items by revenue for a date range"""
+        rows = self.session.query(
+            InventoryItem.name,
+            func.sum(SaleItem.quantity).label('quantity'),
+            func.sum(SaleItem.quantity * SaleItem.unit_price).label('revenue')
+        ).join(SaleItem.inventory_item) \
+            .join(Sale) \
+            .filter(and_(
+                func.date(Sale.date) >= start_date,
+                func.date(Sale.date) <= end_date
+            )) \
+            .group_by(InventoryItem.name) \
+            .order_by(desc(func.sum(SaleItem.quantity * SaleItem.unit_price))) \
+            .limit(limit) \
+            .all()
+
+        return [
+            {'name': row[0], 'quantity': row[1], 'revenue': float(row[2])}
+            for row in rows
+        ]
 
     def void_sale(self, sale_id: int, user_id: int, reason: str) -> bool:
         """Void a sale and restore inventory"""

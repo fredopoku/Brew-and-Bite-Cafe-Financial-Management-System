@@ -5,6 +5,15 @@ from datetime import datetime
 from typing import Dict, List
 from src.database.models import UserRole
 
+try:
+    from src.gui.styles import (CREAM, CARD_BG, ESPRESSO, MEDIUM_BROWN, DARK_BROWN,
+                                 LIGHT_BROWN, BORDER, TEXT_DARK, TEXT_LIGHT, TEXT_MID,
+                                 SUCCESS, WARNING, DANGER, FONT_H2, FONT_H3,
+                                 FONT_BODY, FONT_SMALL)
+    _HAS_STYLES = True
+except ImportError:
+    _HAS_STYLES = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,19 +32,21 @@ class SalesScreen(ttk.Frame):
 
     def create_widgets(self):
         """Create and arrange widgets"""
-        # Main heading
-        heading_frame = ttk.Frame(self)
-        heading_frame.pack(fill="x", padx=10, pady=5)
+        bg = CREAM if _HAS_STYLES else "#f0f0f0"
 
-        ttk.Label(
-            heading_frame,
-            text="Sales Management",
-            font=("Helvetica", 16, "bold")
+        # Header bar
+        heading_frame = tk.Frame(self, bg=bg, pady=12)
+        heading_frame.pack(fill="x", padx=20)
+
+        tk.Label(
+            heading_frame, text="Sales Management",
+            font=FONT_H2 if _HAS_STYLES else ("Helvetica", 16, "bold"),
+            bg=bg, fg=ESPRESSO if _HAS_STYLES else "black"
         ).pack(side="left")
 
         ttk.Button(
-            heading_frame,
-            text="New Sale",
+            heading_frame, text="+ New Sale",
+            style="Primary.TButton" if _HAS_STYLES else "TButton",
             command=self.show_new_sale_dialog
         ).pack(side="right")
 
@@ -296,30 +307,257 @@ class SalesScreen(ttk.Frame):
         self.report_frame = ttk.Frame(tab)
         self.report_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
-    def load_data(self):
-        """Load initial data"""
-        try:
-            # Load inventory items
-            inventory = self.services['inventory'].get_inventory_status()
+    def show_new_sale_dialog(self):
+        """Open a focused POS dialog for a new sale."""
+        bg = CREAM if _HAS_STYLES else "#f0f0f0"
 
-            # Clear existing items
+        try:
+            inventory = self.services['inventory'].get_inventory_status()
+            items = [i for i in inventory['items'] if i['quantity'] > 0]
+        except Exception as e:
+            logger.error(f"Inventory load error: {e}")
+            messagebox.showerror("Error", "Could not load inventory")
+            return
+
+        dlg = tk.Toplevel(self)
+        dlg.title("New Sale")
+        dlg.geometry("700x540")
+        dlg.minsize(600, 460)
+        dlg.configure(bg=bg)
+        dlg.grab_set()
+
+        # Header
+        hdr = tk.Frame(dlg, bg=MEDIUM_BROWN if _HAS_STYLES else "#8B5E3C", pady=10)
+        hdr.pack(fill="x")
+        tk.Label(hdr, text="Point of Sale",
+                 font=("Helvetica", 14, "bold"),
+                 bg=MEDIUM_BROWN if _HAS_STYLES else "#8B5E3C", fg="white").pack(side="left", padx=16)
+
+        body = tk.Frame(dlg, bg=bg)
+        body.pack(fill="both", expand=True, padx=12, pady=10)
+        body.grid_columnconfigure(0, weight=1)
+        body.grid_columnconfigure(1, weight=1)
+        body.grid_rowconfigure(0, weight=1)
+
+        # Left: item selection
+        left = tk.Frame(body, bg=bg)
+        left.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+
+        tk.Label(left, text="Available Items", font=("Helvetica", 10, "bold"),
+                 bg=bg, fg=ESPRESSO if _HAS_STYLES else "black").pack(anchor="w", pady=(0, 4))
+
+        # Search bar
+        search_frame = tk.Frame(left, bg=bg)
+        search_frame.pack(fill="x", pady=(0, 4))
+        search_var = tk.StringVar()
+        search_entry = ttk.Entry(search_frame, textvariable=search_var)
+        search_entry.pack(fill="x")
+
+        inv_cols = ("Name", "Stock", "Price")
+        inv_tree = ttk.Treeview(left, columns=inv_cols, show="headings",
+                                selectmode="browse", height=14)
+        for col, w in [("Name", 160), ("Stock", 60), ("Price", 70)]:
+            inv_tree.heading(col, text=col)
+            inv_tree.column(col, width=w)
+
+        inv_sb = ttk.Scrollbar(left, orient="vertical", command=inv_tree.yview)
+        inv_tree.configure(yscrollcommand=inv_sb.set)
+        inv_tree.pack(side="left", fill="both", expand=True)
+        inv_sb.pack(side="right", fill="y")
+
+        def populate_inv(filter_text=""):
+            inv_tree.delete(*inv_tree.get_children())
+            for it in items:
+                if filter_text.lower() in it['name'].lower():
+                    inv_tree.insert("", "end", values=(
+                        it['name'], it['quantity'],
+                        f"${it['unit_cost']:.2f}"
+                    ))
+
+        populate_inv()
+        search_var.trace_add('write', lambda *_: populate_inv(search_entry.get()))
+
+        # Qty row
+        qty_row = tk.Frame(left, bg=bg)
+        qty_row.pack(fill="x", pady=(6, 0))
+        tk.Label(qty_row, text="Qty:", bg=bg,
+                 font=FONT_SMALL if _HAS_STYLES else ("Helvetica", 10)).pack(side="left")
+        qty_var = tk.StringVar(value="1")
+        qty_entry = ttk.Entry(qty_row, textvariable=qty_var, width=6)
+        qty_entry.pack(side="left", padx=4)
+
+        # Right: current sale
+        right = tk.Frame(body, bg=bg)
+        right.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+
+        tk.Label(right, text="Current Sale", font=("Helvetica", 10, "bold"),
+                 bg=bg, fg=ESPRESSO if _HAS_STYLES else "black").pack(anchor="w", pady=(0, 4))
+
+        sale_cols = ("Item", "Qty", "Unit", "Total")
+        sale_tree = ttk.Treeview(right, columns=sale_cols, show="headings",
+                                 selectmode="browse", height=14)
+        for col, w in [("Item", 140), ("Qty", 40), ("Unit", 65), ("Total", 70)]:
+            sale_tree.heading(col, text=col)
+            sale_tree.column(col, width=w)
+
+        sale_sb = ttk.Scrollbar(right, orient="vertical", command=sale_tree.yview)
+        sale_tree.configure(yscrollcommand=sale_sb.set)
+        sale_tree.pack(side="left", fill="both", expand=True)
+        sale_sb.pack(side="right", fill="y")
+
+        sale_items = []
+
+        def refresh_sale_tree():
+            sale_tree.delete(*sale_tree.get_children())
+            for si in sale_items:
+                sale_tree.insert("", "end", values=(
+                    si['name'], si['qty'],
+                    f"${si['unit']:.2f}", f"${si['total']:.2f}"
+                ))
+
+        def add_item():
+            sel = inv_tree.selection()
+            if not sel:
+                messagebox.showwarning("Select Item", "Please select an item first.", parent=dlg)
+                return
+            vals = inv_tree.item(sel[0])['values']
+            try:
+                qty = int(qty_entry.get())
+                if qty <= 0:
+                    raise ValueError
+            except ValueError:
+                messagebox.showerror("Error", "Quantity must be a positive integer.", parent=dlg)
+                return
+            stock = int(vals[1])
+            if qty > stock:
+                messagebox.showerror("Error", f"Only {stock} in stock.", parent=dlg)
+                return
+            unit = float(str(vals[2]).replace("$", ""))
+            name = str(vals[0])
+            # Look up inventory_item_id by name
+            inv_item = next((it for it in items if it['name'] == name), None)
+            if not inv_item:
+                messagebox.showerror("Error", f"Could not find item '{name}'.", parent=dlg)
+                return
+            item_id = inv_item['id']
+            # Merge if same item already in sale
+            for si in sale_items:
+                if si['name'] == name:
+                    si['qty']   += qty
+                    si['total']  = si['qty'] * si['unit']
+                    refresh_sale_tree()
+                    update_total()
+                    return
+            sale_items.append({'name': name, 'qty': qty, 'unit': unit,
+                               'total': qty * unit, 'item_id': item_id})
+            refresh_sale_tree()
+            update_total()
+
+        def remove_item():
+            sel = sale_tree.selection()
+            if not sel:
+                return
+            idx = sale_tree.index(sel[0])
+            if 0 <= idx < len(sale_items):
+                sale_items.pop(idx)
+            refresh_sale_tree()
+            update_total()
+
+        def update_total():
+            t = sum(si['total'] for si in sale_items)
+            total_lbl.config(text=f"Total: ${t:,.2f}")
+
+        ttk.Button(qty_row, text="Add →",
+                   style="Primary.TButton" if _HAS_STYLES else "TButton",
+                   command=add_item).pack(side="left", padx=4)
+        ttk.Button(qty_row, text="Remove",
+                   style="Danger.TButton" if _HAS_STYLES else "TButton",
+                   command=remove_item).pack(side="left")
+
+        # Footer
+        footer = tk.Frame(dlg, bg=bg, pady=8)
+        footer.pack(fill="x", padx=12)
+
+        tk.Label(footer, text="Payment:",
+                 bg=bg, font=FONT_SMALL if _HAS_STYLES else ("Helvetica", 10)).pack(side="left")
+        pay_var = tk.StringVar(value="Cash")
+        pay_combo = ttk.Combobox(footer, textvariable=pay_var,
+                                 values=["Cash", "Card", "Mobile"],
+                                 state="readonly", width=10)
+        pay_combo.pack(side="left", padx=(4, 16))
+
+        total_lbl = tk.Label(footer, text="Total: $0.00",
+                             font=("Helvetica", 14, "bold"),
+                             bg=bg, fg=ESPRESSO if _HAS_STYLES else "black")
+        total_lbl.pack(side="left")
+
+        ttk.Button(footer, text="Cancel",
+                   style="Secondary.TButton" if _HAS_STYLES else "TButton",
+                   command=dlg.destroy).pack(side="right", padx=(6, 0))
+
+        def complete():
+            if not sale_items:
+                messagebox.showwarning("Empty Sale", "Please add items to the sale.", parent=dlg)
+                return
+            payment = pay_combo.get()
+            try:
+                api_items = [
+                    {'inventory_item_id': si['item_id'],
+                     'quantity': si['qty'],
+                     'unit_price': si['unit']}
+                    for si in sale_items
+                ]
+                self.services['sales'].create_sale(
+                    items=api_items,
+                    payment_method=payment,
+                    user_id=1
+                )
+                total = sum(si['total'] for si in sale_items)
+                messagebox.showinfo(
+                    "Sale Complete",
+                    f"Sale completed successfully!\n\n"
+                    f"Items: {len(sale_items)}\n"
+                    f"Payment: {payment}\n"
+                    f"Total: ${total:,.2f}",
+                    parent=dlg
+                )
+                dlg.destroy()
+                self.load_data()
+            except Exception as ex:
+                logger.error(f"Complete sale error: {ex}")
+                messagebox.showerror("Error", str(ex) or "Failed to complete sale", parent=dlg)
+
+        ttk.Button(footer, text="Complete Sale ✓",
+                   style="Success.TButton" if _HAS_STYLES else "TButton",
+                   command=complete).pack(side="right")
+
+        inv_tree.bind("<Double-1>", lambda e: add_item())
+        dlg.bind("<Return>", lambda e: add_item())
+
+    def load_data(self):
+        """Load initial data — each section fails independently."""
+        # Load inventory items
+        try:
+            inventory = self.services['inventory'].get_inventory_status()
+            self._item_id_map = {}
             for item in self.inventory_tree.get_children():
                 self.inventory_tree.delete(item)
-
-            # Add items to treeview
             for item in inventory['items']:
+                self._item_id_map[item['name']] = item['id']
                 self.inventory_tree.insert("", "end", values=(
                     item['name'],
                     item['quantity'],
                     f"${item['unit_cost']:.2f}"
                 ))
-
-            # Load sales history
-            self.load_sales_history()
-
         except Exception as e:
-            logger.error(f"Error loading data: {str(e)}")
-            messagebox.showerror("Error", "Failed to load data")
+            logger.error(f"Inventory load error: {e}")
+            try:
+                self.services['inventory'].session.rollback()
+            except Exception:
+                pass
+
+        # Load sales history
+        self.load_sales_history()
 
     def add_item_to_sale(self):
         """Add selected item to current sale"""
@@ -395,35 +633,36 @@ class SalesScreen(ttk.Frame):
                 messagebox.showwarning("Warning", "No items in current sale")
                 return
 
+            id_map = getattr(self, '_item_id_map', {})
+
             # Prepare sale items
             items = []
             for item in self.sale_tree.get_children():
                 values = self.sale_tree.item(item)['values']
+                name = str(values[0])
+                item_id = id_map.get(name)
+                if not item_id:
+                    messagebox.showerror("Error", f"Cannot find inventory ID for '{name}'. Reload and try again.")
+                    return
                 items.append({
-                    'name': values[0],
-                    'quantity': values[1],
-                    'unit_price': float(values[2].replace('$', '')),
-                    'total': float(values[3].replace('$', ''))
+                    'inventory_item_id': item_id,
+                    'quantity': int(values[1]),
+                    'unit_price': float(str(values[2]).replace('$', '')),
                 })
 
-            # Create sale record
-            sale = self.services['sales'].create_sale(
+            self.services['sales'].create_sale(
                 items=items,
                 payment_method=self.payment_var.get(),
-                user_id=1  # TODO: Get actual user ID
+                user_id=1
             )
 
             messagebox.showinfo("Success", "Sale completed successfully!")
-
-            # Clear current sale
             self.clear_sale()
-
-            # Refresh data
             self.load_data()
 
         except Exception as e:
             logger.error(f"Error completing sale: {str(e)}")
-            messagebox.showerror("Error", "Failed to complete sale")
+            messagebox.showerror("Error", str(e) or "Failed to complete sale")
 
     def load_sales_history(self):
         """Load sales history data"""
@@ -433,7 +672,7 @@ class SalesScreen(ttk.Frame):
             end_date = self.end_date_var.get()
 
             # Get sales history
-            sales = self.services['sales'].get_sales_report(
+            sales = self.services['sales'].get_sales(
                 start_date=start_date,
                 end_date=end_date
             )
@@ -443,9 +682,9 @@ class SalesScreen(ttk.Frame):
                 self.history_tree.delete(item)
 
             # Add sales to treeview
-            for sale in sales['sales_over_time']:
+            for sale in sales:
                 self.history_tree.insert("", "end", values=(
-                    sale['date'],
+                    sale['date'][:10],
                     sale['id'],
                     len(sale['items']),
                     f"${sale['total_amount']:.2f}",
@@ -457,266 +696,270 @@ class SalesScreen(ttk.Frame):
             logger.error(f"Error loading sales history: {str(e)}")
             messagebox.showerror("Error", "Failed to load sales history")
 
-        def export_sales_history(self):
-            """Export sales history to CSV"""
-            try:
-                start_date = self.start_date_var.get()
-                end_date = self.end_date_var.get()
+    def export_sales_history(self):
+        """Export sales history to CSV"""
+        try:
+            start_date = self.start_date_var.get()
+            end_date = self.end_date_var.get()
 
-                # Generate report
-                report_data = self.services['reporting'].export_report(
-                    report_type='sales',
-                    start_date=start_date,
-                    end_date=end_date,
-                    format='csv'
-                )
+            report_data = self.services['reporting'].export_report(
+                report_type='periodic',
+                start_date=start_date,
+                end_date=end_date,
+                format='csv'
+            )
 
-                # Save file
-                import tkinter.filedialog as filedialog
-                filename = filedialog.asksaveasfilename(
-                    defaultextension=".csv",
-                    filetypes=[("CSV files", "*.csv")],
-                    initialfile=f"sales_history_{start_date}_to_{end_date}.csv"
-                )
+            import tkinter.filedialog as filedialog
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv")],
+                initialfile=f"sales_history_{start_date}_to_{end_date}.csv"
+            )
 
-                if filename:
-                    with open(filename, 'wb') as f:
-                        f.write(report_data)
-                    messagebox.showinfo("Success", "Sales history exported successfully!")
+            if filename:
+                with open(filename, 'wb') as f:
+                    f.write(report_data)
+                messagebox.showinfo("Success", "Sales history exported successfully!")
 
-            except Exception as e:
-                logger.error(f"Error exporting sales history: {str(e)}")
-                messagebox.showerror("Error", "Failed to export sales history")
+        except Exception as e:
+            logger.error(f"Error exporting sales history: {str(e)}")
+            messagebox.showerror("Error", "Failed to export sales history")
 
-        def generate_report(self):
-            """Generate selected sales report"""
-            try:
-                # Clear report frame
-                for widget in self.report_frame.winfo_children():
-                    widget.destroy()
+    def generate_report(self):
+        """Generate selected sales report"""
+        try:
+            # Clear report frame
+            for widget in self.report_frame.winfo_children():
+                widget.destroy()
 
-                report_type = self.report_type_var.get()
+            report_type = self.report_type_var.get()
 
-                if report_type == "Daily Sales":
-                    self._generate_daily_sales_report()
-                elif report_type == "Monthly Sales":
-                    self._generate_monthly_sales_report()
-                else:  # Product Performance
-                    self._generate_product_performance_report()
+            if report_type == "Daily Sales":
+                self._generate_daily_sales_report()
+            elif report_type == "Monthly Sales":
+                self._generate_monthly_sales_report()
+            else:  # Product Performance
+                self._generate_product_performance_report()
 
-            except Exception as e:
-                logger.error(f"Error generating report: {str(e)}")
-                messagebox.showerror("Error", "Failed to generate report")
+        except Exception as e:
+            logger.error(f"Error generating report: {str(e)}")
+            messagebox.showerror("Error", "Failed to generate report")
 
-        def _generate_daily_sales_report(self):
-            """Generate daily sales report"""
-            # Get today's date
+    def _generate_daily_sales_report(self):
+        """Generate daily sales report"""
+        # Get today's date
+        today = datetime.now().strftime('%Y-%m-%d')
+
+        # Get sales data
+        sales_data = self.services['sales'].get_daily_sales_summary(today)
+
+        # Create report widgets
+        ttk.Label(
+            self.report_frame,
+            text=f"Daily Sales Report - {today}",
+            font=("Helvetica", 12, "bold")
+        ).pack(pady=10)
+
+        # Summary frame
+        summary_frame = ttk.LabelFrame(self.report_frame, text="Summary")
+        summary_frame.pack(fill="x", padx=5, pady=5)
+
+        # Add summary info
+        summary_info = [
+            ("Total Sales:", f"${sales_data['summary']['total_sales']:.2f}"),
+            ("Transactions:", str(sales_data['summary']['transaction_count'])),
+            ("Average Sale:", f"${sales_data['summary']['average_sale']:.2f}")
+        ]
+
+        for i, (label, value) in enumerate(summary_info):
+            ttk.Label(summary_frame, text=label).grid(row=i, column=0, padx=5, pady=2)
+            ttk.Label(summary_frame, text=value).grid(row=i, column=1, padx=5, pady=2)
+
+        # Top items frame
+        items_frame = ttk.LabelFrame(self.report_frame, text="Top Selling Items")
+        items_frame.pack(fill="x", padx=5, pady=5)
+
+        # Create treeview for top items
+        columns = ("Item", "Quantity", "Revenue")
+        items_tree = ttk.Treeview(
+            items_frame,
+            columns=columns,
+            show="headings",
+            height=5
+        )
+
+        for col in columns:
+            items_tree.heading(col, text=col)
+            items_tree.column(col, width=100)
+
+        items_tree.pack(fill="x", padx=5, pady=5)
+
+        # Add top items
+        for item in sales_data['top_items']:
+            items_tree.insert("", "end", values=(
+                item['name'],
+                item['quantity'],
+                f"${item['revenue']:.2f}"
+            ))
+
+    def _generate_monthly_sales_report(self):
+        """Generate monthly sales report"""
+        # Get current month's date range
+        today = datetime.now()
+        start_date = today.replace(day=1).strftime('%Y-%m-%d')
+        end_date = today.strftime('%Y-%m-%d')
+
+        # Get sales data
+        sales_data = self.services['sales'].get_sales_report(
+            start_date=start_date,
+            end_date=end_date,
+            group_by='day'
+        )
+
+        # Create report widgets
+        ttk.Label(
+            self.report_frame,
+            text=f"Monthly Sales Report - {today.strftime('%B %Y')}",
+            font=("Helvetica", 12, "bold")
+        ).pack(pady=10)
+
+        # Summary frame
+        summary_frame = ttk.LabelFrame(self.report_frame, text="Summary")
+        summary_frame.pack(fill="x", padx=5, pady=5)
+
+        # Add summary info
+        summary_info = [
+            ("Total Revenue:", f"${sales_data['summary']['total_revenue']:.2f}"),
+            ("Total Transactions:", str(sales_data['summary']['total_transactions'])),
+            ("Average Transaction:", f"${sales_data['summary']['average_transaction']:.2f}")
+        ]
+
+        for i, (label, value) in enumerate(summary_info):
+            ttk.Label(summary_frame, text=label).grid(row=i, column=0, padx=5, pady=2)
+            ttk.Label(summary_frame, text=value).grid(row=i, column=1, padx=5, pady=2)
+
+        # Daily sales frame
+        daily_frame = ttk.LabelFrame(self.report_frame, text="Daily Sales")
+        daily_frame.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # Create treeview for daily sales
+        columns = ("Date", "Sales", "Transactions", "Average")
+        daily_tree = ttk.Treeview(
+            daily_frame,
+            columns=columns,
+            show="headings"
+        )
+
+        for col in columns:
+            daily_tree.heading(col, text=col)
+            daily_tree.column(col, width=100)
+
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(
+            daily_frame,
+            orient="vertical",
+            command=daily_tree.yview
+        )
+        daily_tree.configure(yscrollcommand=scrollbar.set)
+
+        daily_tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Add daily sales data
+        for day in sales_data['sales_over_time']:
+            daily_tree.insert("", "end", values=(
+                day['date'],
+                f"${day['total_amount']:.2f}",
+                day['transaction_count'],
+                f"${day['average_sale']:.2f}"
+            ))
+
+    def _generate_product_performance_report(self):
+        """Generate product performance report"""
+        # Get current month's date range
+        today = datetime.now()
+        start_date = today.replace(day=1).strftime('%Y-%m-%d')
+        end_date = today.strftime('%Y-%m-%d')
+
+        # Get top selling items
+        items_data = self.services['sales'].get_top_selling_items(
+            start_date=start_date,
+            end_date=end_date,
+            limit=10
+        )
+
+        # Create report widgets
+        ttk.Label(
+            self.report_frame,
+            text=f"Product Performance Report - {today.strftime('%B %Y')}",
+            font=("Helvetica", 12, "bold")
+        ).pack(pady=10)
+
+        # Create treeview for products
+        columns = ("Product", "Units Sold", "Revenue", "Average Price")
+        product_tree = ttk.Treeview(
+            self.report_frame,
+            columns=columns,
+            show="headings"
+        )
+
+        for col in columns:
+            product_tree.heading(col, text=col)
+            product_tree.column(col, width=100)
+
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(
+            self.report_frame,
+            orient="vertical",
+            command=product_tree.yview
+        )
+        product_tree.configure(yscrollcommand=scrollbar.set)
+
+        product_tree.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        scrollbar.pack(side="right", fill="y")
+
+        # Add product data
+        for item in items_data:
+            avg_price = item['revenue'] / item['quantity'] if item['quantity'] > 0 else 0
+            product_tree.insert("", "end", values=(
+                item['name'],
+                item['quantity'],
+                f"${item['revenue']:.2f}",
+                f"${avg_price:.2f}"
+            ))
+
+    def export_report(self):
+        """Export current report"""
+        _TYPE_MAP = {
+            "Daily Sales": "daily",
+            "Monthly Sales": "periodic",
+            "Product Performance": "periodic",
+        }
+        try:
             today = datetime.now().strftime('%Y-%m-%d')
+            selected = self.report_type_var.get()
+            report_type = _TYPE_MAP.get(selected, "periodic")
 
-            # Get sales data
-            sales_data = self.services['sales'].get_daily_sales_summary(today)
-
-            # Create report widgets
-            ttk.Label(
-                self.report_frame,
-                text=f"Daily Sales Report - {today}",
-                font=("Helvetica", 12, "bold")
-            ).pack(pady=10)
-
-            # Summary frame
-            summary_frame = ttk.LabelFrame(self.report_frame, text="Summary")
-            summary_frame.pack(fill="x", padx=5, pady=5)
-
-            # Add summary info
-            summary_info = [
-                ("Total Sales:", f"${sales_data['summary']['total_sales']:.2f}"),
-                ("Transactions:", str(sales_data['summary']['transaction_count'])),
-                ("Average Sale:", f"${sales_data['summary']['average_sale']:.2f}")
-            ]
-
-            for i, (label, value) in enumerate(summary_info):
-                ttk.Label(summary_frame, text=label).grid(row=i, column=0, padx=5, pady=2)
-                ttk.Label(summary_frame, text=value).grid(row=i, column=1, padx=5, pady=2)
-
-            # Top items frame
-            items_frame = ttk.LabelFrame(self.report_frame, text="Top Selling Items")
-            items_frame.pack(fill="x", padx=5, pady=5)
-
-            # Create treeview for top items
-            columns = ("Item", "Quantity", "Revenue")
-            items_tree = ttk.Treeview(
-                items_frame,
-                columns=columns,
-                show="headings",
-                height=5
+            report_data = self.services['reporting'].export_report(
+                report_type=report_type,
+                start_date=today,
+                end_date=today,
+                format='csv'
             )
 
-            for col in columns:
-                items_tree.heading(col, text=col)
-                items_tree.column(col, width=100)
-
-            items_tree.pack(fill="x", padx=5, pady=5)
-
-            # Add top items
-            for item in sales_data['top_items']:
-                items_tree.insert("", "end", values=(
-                    item['name'],
-                    item['quantity'],
-                    f"${item['revenue']:.2f}"
-                ))
-
-        def _generate_monthly_sales_report(self):
-            """Generate monthly sales report"""
-            # Get current month's date range
-            today = datetime.now()
-            start_date = today.replace(day=1).strftime('%Y-%m-%d')
-            end_date = today.strftime('%Y-%m-%d')
-
-            # Get sales data
-            sales_data = self.services['sales'].get_sales_report(
-                start_date=start_date,
-                end_date=end_date,
-                group_by='day'
+            import tkinter.filedialog as filedialog
+            safe_name = selected.lower().replace(" ", "_")
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv")],
+                initialfile=f"{safe_name}_report_{datetime.now().strftime('%Y%m%d')}.csv"
             )
 
-            # Create report widgets
-            ttk.Label(
-                self.report_frame,
-                text=f"Monthly Sales Report - {today.strftime('%B %Y')}",
-                font=("Helvetica", 12, "bold")
-            ).pack(pady=10)
+            if filename:
+                with open(filename, 'wb') as f:
+                    f.write(report_data)
+                messagebox.showinfo("Success", "Report exported successfully!")
 
-            # Summary frame
-            summary_frame = ttk.LabelFrame(self.report_frame, text="Summary")
-            summary_frame.pack(fill="x", padx=5, pady=5)
-
-            # Add summary info
-            summary_info = [
-                ("Total Revenue:", f"${sales_data['summary']['total_revenue']:.2f}"),
-                ("Total Transactions:", str(sales_data['summary']['total_transactions'])),
-                ("Average Transaction:", f"${sales_data['summary']['average_transaction']:.2f}")
-            ]
-
-            for i, (label, value) in enumerate(summary_info):
-                ttk.Label(summary_frame, text=label).grid(row=i, column=0, padx=5, pady=2)
-                ttk.Label(summary_frame, text=value).grid(row=i, column=1, padx=5, pady=2)
-
-            # Daily sales frame
-            daily_frame = ttk.LabelFrame(self.report_frame, text="Daily Sales")
-            daily_frame.pack(fill="both", expand=True, padx=5, pady=5)
-
-            # Create treeview for daily sales
-            columns = ("Date", "Sales", "Transactions", "Average")
-            daily_tree = ttk.Treeview(
-                daily_frame,
-                columns=columns,
-                show="headings"
-            )
-
-            for col in columns:
-                daily_tree.heading(col, text=col)
-                daily_tree.column(col, width=100)
-
-            # Add scrollbar
-            scrollbar = ttk.Scrollbar(
-                daily_frame,
-                orient="vertical",
-                command=daily_tree.yview
-            )
-            daily_tree.configure(yscrollcommand=scrollbar.set)
-
-            daily_tree.pack(side="left", fill="both", expand=True)
-            scrollbar.pack(side="right", fill="y")
-
-            # Add daily sales data
-            for day in sales_data['sales_over_time']:
-                daily_tree.insert("", "end", values=(
-                    day['date'],
-                    f"${day['total_amount']:.2f}",
-                    day['transaction_count'],
-                    f"${day['average_sale']:.2f}"
-                ))
-
-        def _generate_product_performance_report(self):
-            """Generate product performance report"""
-            # Get current month's date range
-            today = datetime.now()
-            start_date = today.replace(day=1).strftime('%Y-%m-%d')
-            end_date = today.strftime('%Y-%m-%d')
-
-            # Get top selling items
-            items_data = self.services['sales'].get_top_selling_items(
-                start_date=start_date,
-                end_date=end_date,
-                limit=10
-            )
-
-            # Create report widgets
-            ttk.Label(
-                self.report_frame,
-                text=f"Product Performance Report - {today.strftime('%B %Y')}",
-                font=("Helvetica", 12, "bold")
-            ).pack(pady=10)
-
-            # Create treeview for products
-            columns = ("Product", "Units Sold", "Revenue", "Average Price")
-            product_tree = ttk.Treeview(
-                self.report_frame,
-                columns=columns,
-                show="headings"
-            )
-
-            for col in columns:
-                product_tree.heading(col, text=col)
-                product_tree.column(col, width=100)
-
-            # Add scrollbar
-            scrollbar = ttk.Scrollbar(
-                self.report_frame,
-                orient="vertical",
-                command=product_tree.yview
-            )
-            product_tree.configure(yscrollcommand=scrollbar.set)
-
-            product_tree.pack(side="left", fill="both", expand=True, padx=5, pady=5)
-            scrollbar.pack(side="right", fill="y")
-
-            # Add product data
-            for item in items_data:
-                avg_price = item['revenue'] / item['quantity'] if item['quantity'] > 0 else 0
-                product_tree.insert("", "end", values=(
-                    item['name'],
-                    item['quantity'],
-                    f"${item['revenue']:.2f}",
-                    f"${avg_price:.2f}"
-                ))
-
-        def export_report(self):
-            """Export current report"""
-            try:
-                report_type = self.report_type_var.get().lower().replace(" ", "_")
-
-                # Generate report
-                report_data = self.services['reporting'].export_report(
-                    report_type=report_type,
-                    start_date=datetime.now().strftime('%Y-%m-%d'),  # Today
-                    end_date=datetime.now().strftime('%Y-%m-%d'),
-                    format='pdf'
-                )
-
-                # Save file
-                import tkinter.filedialog as filedialog
-                filename = filedialog.asksaveasfilename(
-                    defaultextension=".pdf",
-                    filetypes=[("PDF files", "*.pdf")],
-                    initialfile=f"{report_type}_report_{datetime.now().strftime('%Y%m%d')}.pdf"
-                )
-
-                if filename:
-                    with open(filename, 'wb') as f:
-                        f.write(report_data)
-                    messagebox.showinfo("Success", "Report exported successfully!")
-
-            except Exception as e:
-                logger.error(f"Error exporting report: {str(e)}")
-                messagebox.showerror("Error", "Failed to export report")
+        except Exception as e:
+            logger.error(f"Error exporting report: {str(e)}")
+            messagebox.showerror("Error", "Failed to export report")

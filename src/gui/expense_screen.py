@@ -5,6 +5,15 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Dict, List, Optional
 
+try:
+    from src.gui.styles import (CREAM, CARD_BG, ESPRESSO, MEDIUM_BROWN, DARK_BROWN,
+                                 LIGHT_BROWN, BORDER, TEXT_DARK, TEXT_LIGHT, TEXT_MID,
+                                 SUCCESS, WARNING, DANGER, FONT_H2, FONT_H3,
+                                 FONT_BODY, FONT_SMALL)
+    _HAS_STYLES = True
+except ImportError:
+    _HAS_STYLES = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -13,39 +22,41 @@ class ExpenseScreen(ttk.Frame):
         super().__init__(parent)
         self.parent = parent
         self.services = services
-        self.selected_expense = None
+        self.selected_expense = None  # stores row values; [0] = expense ID
 
         self.create_widgets()
         self.load_data()
 
     def create_widgets(self):
         """Create and arrange widgets"""
-        # Main heading
-        heading_frame = ttk.Frame(self)
-        heading_frame.pack(fill="x", padx=10, pady=5)
+        bg = CREAM if _HAS_STYLES else None
 
-        ttk.Label(
-            heading_frame,
-            text="Expense Management",
-            font=("Helvetica", 16, "bold")
+        # Header bar
+        heading_frame = tk.Frame(self, bg=bg or "#f0f0f0", pady=12)
+        heading_frame.pack(fill="x", padx=20)
+
+        tk.Label(
+            heading_frame, text="Expense Management",
+            font=FONT_H2 if _HAS_STYLES else ("Helvetica", 16, "bold"),
+            bg=bg or "#f0f0f0",
+            fg=ESPRESSO if _HAS_STYLES else "black"
         ).pack(side="left")
 
         ttk.Button(
             heading_frame,
-            text="Record Expense",
+            text="+ Record Expense",
+            style="Primary.TButton" if _HAS_STYLES else "TButton",
             command=self.show_add_expense_dialog
         ).pack(side="right")
 
-        # Create notebook for different views
+        # Notebook for tabs
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill="both", expand=True, padx=10, pady=5)
 
-        # Create tabs
         self.create_expenses_tab()
         self.create_categories_tab()
         self.create_analysis_tab()
 
-        # Pack main frame
         self.pack(fill="both", expand=True)
 
     def create_expenses_tab(self):
@@ -103,8 +114,8 @@ class ExpenseScreen(ttk.Frame):
             command=self.export_expenses
         ).pack(side="right", padx=5)
 
-        # Create expenses treeview
-        columns = ("Date", "Category", "Amount", "Description", "Added By")
+        # Create expenses treeview (ID is column 0, hidden with width=0)
+        columns = ("ID", "Date", "Category", "Amount", "Description", "Added By")
         self.expenses_tree = ttk.Treeview(
             tab,
             columns=columns,
@@ -112,7 +123,9 @@ class ExpenseScreen(ttk.Frame):
             selectmode="browse"
         )
 
-        # Configure columns
+        # ID column hidden
+        self.expenses_tree.heading("ID", text="ID")
+        self.expenses_tree.column("ID", width=0, minwidth=0, stretch=False)
         self.expenses_tree.heading("Date", text="Date")
         self.expenses_tree.column("Date", width=100)
         self.expenses_tree.heading("Category", text="Category")
@@ -316,95 +329,104 @@ class ExpenseScreen(ttk.Frame):
 
     def show_add_expense_dialog(self):
         """Show dialog to add new expense"""
+        bg = CREAM if _HAS_STYLES else "#f0f0f0"
         dialog = tk.Toplevel(self)
         dialog.title("Record Expense")
-        dialog.geometry("400x500")
+        dialog.geometry("440x440")
+        dialog.resizable(False, False)
+        dialog.configure(bg=bg)
         dialog.grab_set()
 
-        # Create expense form
-        ttk.Label(dialog, text="Category:").pack(pady=5)
+        # Header
+        hdr = tk.Frame(dialog, bg=MEDIUM_BROWN if _HAS_STYLES else "#6B4423", pady=14)
+        hdr.pack(fill="x")
+        tk.Label(hdr, text="Record New Expense",
+                 font=FONT_H3 if _HAS_STYLES else ("Helvetica", 13, "bold"),
+                 bg=MEDIUM_BROWN if _HAS_STYLES else "#6B4423",
+                 fg=CARD_BG if _HAS_STYLES else "white").pack()
+
+        # Form area
+        form = tk.Frame(dialog, bg=bg, padx=28, pady=14)
+        form.pack(fill="both", expand=True)
+
+        def _lbl(text):
+            tk.Label(form, text=text,
+                     font=FONT_SMALL if _HAS_STYLES else ("Helvetica", 10),
+                     bg=bg,
+                     fg=TEXT_MID if _HAS_STYLES else "#555").pack(anchor="w", pady=(8, 1))
+
+        _lbl("Category *")
         category_var = tk.StringVar()
         category_combo = ttk.Combobox(
-            dialog,
-            textvariable=category_var,
+            form, textvariable=category_var,
             values=[cat['name'] for cat in self.services['expense'].get_categories()],
-            state="readonly",
-            width=30
+            state="readonly", width=36, font=FONT_BODY if _HAS_STYLES else None
         )
-        category_combo.pack(pady=5)
+        category_combo.pack(fill="x")
 
-        ttk.Label(dialog, text="Amount ($):").pack(pady=5)
-        amount_var = tk.StringVar()
-        ttk.Entry(
-            dialog,
-            textvariable=amount_var,
-            width=30
-        ).pack(pady=5)
+        _lbl("Amount ($) *")
+        amount_entry = ttk.Entry(form, width=38)
+        amount_entry.pack(fill="x")
 
-        ttk.Label(dialog, text="Date:").pack(pady=5)
-        date_var = tk.StringVar(value=datetime.now().strftime("%Y-%m-%d"))
-        ttk.Entry(
-            dialog,
-            textvariable=date_var,
-            width=30
-        ).pack(pady=5)
+        _lbl("Date (YYYY-MM-DD)")
+        date_entry = ttk.Entry(form, width=38)
+        date_entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
+        date_entry.pack(fill="x")
 
-        ttk.Label(dialog, text="Description:").pack(pady=5)
-        description_var = tk.StringVar()
-        ttk.Entry(
-            dialog,
-            textvariable=description_var,
-            width=30
-        ).pack(pady=5)
+        _lbl("Description *")
+        desc_entry = ttk.Entry(form, width=38)
+        desc_entry.pack(fill="x")
 
         def save_expense():
             try:
-                # Validate inputs
-                category = category_var.get()
+                # Read directly from widgets — textvariable can lag on macOS in grab_set dialogs
+                category = category_combo.get()
                 if not category:
                     raise ValueError("Please select a category")
 
                 try:
-                    amount = float(amount_var.get())
+                    amount = float(amount_entry.get())
                     if amount <= 0:
                         raise ValueError()
                 except ValueError:
                     raise ValueError("Amount must be a positive number")
 
-                description = description_var.get().strip()
+                description = desc_entry.get().strip()
                 if not description:
                     raise ValueError("Please enter a description")
 
+                cats = self.services['expense'].get_categories()
+                cat_match = next((c for c in cats if c['name'] == category), None)
+                if not cat_match:
+                    raise ValueError("Selected category not found — please try again")
+
                 # Create expense
                 self.services['expense'].record_expense(
-                    user_id=1,  # TODO: Get actual user ID
-                    category_id=next(
-                        cat['id'] for cat in self.services['expense'].get_categories()
-                        if cat['name'] == category
-                    ),
+                    user_id=1,
+                    category_id=cat_match['id'],
                     amount=amount,
                     description=description,
-                    expense_date=date_var.get()
+                    expense_date=date_entry.get()
                 )
 
                 messagebox.showinfo("Success", "Expense recorded successfully!")
                 dialog.destroy()
-
-                # Refresh expenses list
                 self.load_expenses()
 
             except ValueError as e:
-                messagebox.showerror("Error", str(e))
+                messagebox.showerror("Validation Error", str(e))
             except Exception as e:
-                logger.error(f"Error recording expense: {str(e)}")
+                logger.error(f"Error recording expense: {e}")
                 messagebox.showerror("Error", "Failed to record expense")
 
-        # Add save button
-        ttk.Button(
-            dialog,
-            text="Save",
-            command=save_expense
-        ).pack(pady=20)
+        # Button row
+        btn_frame = tk.Frame(dialog, bg=bg, pady=12)
+        btn_frame.pack(fill="x", padx=28)
+        ttk.Button(btn_frame, text="Cancel", style="Secondary.TButton" if _HAS_STYLES else "TButton",
+                   command=dialog.destroy).pack(side="right", padx=(6, 0))
+        ttk.Button(btn_frame, text="Save Expense",
+                   style="Primary.TButton" if _HAS_STYLES else "TButton",
+                   command=save_expense).pack(side="right")
 
     def show_context_menu(self, event):
         """Show context menu for selected expense"""
@@ -519,12 +541,14 @@ class ExpenseScreen(ttk.Frame):
                 if not description:
                     raise ValueError("Please enter a description")
 
-                # Update expense
+                # Update expense — use combo.get() to avoid macOS textvariable lag
+                cat_name = category_combo.get()
+                cats = self.services['expense'].get_categories()
+                cat_match = next((c for c in cats if c['name'] == cat_name), None)
+                if not cat_match:
+                    raise ValueError("Please select a valid category")
                 update_data = {
-                    'category_id': next(
-                        cat['id'] for cat in self.services['expense'].get_categories()
-                        if cat['name'] == category_var.get()
-                    ),
+                    'category_id': cat_match['id'],
                     'amount': amount,
                     'date': date_var.get(),
                     'description': description
@@ -579,6 +603,19 @@ class ExpenseScreen(ttk.Frame):
                 logger.error(f"Error deleting expense: {str(e)}")
                 messagebox.showerror("Error", "Failed to delete expense")
 
+    def load_categories(self):
+        """Load categories into the categories treeview"""
+        try:
+            for item in self.categories_tree.get_children():
+                self.categories_tree.delete(item)
+            categories = self.services['expense'].get_categories()
+            for cat in categories:
+                self.categories_tree.insert("", "end", values=(
+                    cat['name'], 'expense', cat.get('description', '')
+                ))
+        except Exception as e:
+            logger.error(f"Error loading categories: {str(e)}")
+
     def load_expenses(self):
         """Load expenses based on current filters"""
         try:
@@ -591,19 +628,22 @@ class ExpenseScreen(ttk.Frame):
                 self.expenses_tree.delete(item)
 
             # Get expenses
-            expenses = self.services['expense'].get_expense_summary(
+            category_id = next(
+                (cat['id'] for cat in self.services['expense'].get_categories()
+                 if cat['name'] == category),
+                None
+            ) if category != "All" else None
+
+            expenses = self.services['expense'].get_expenses(
                 start_date=start_date,
                 end_date=end_date,
-                category_id=next(
-                    (cat['id'] for cat in self.services['expense'].get_categories()
-                     if cat['name'] == category),
-                    None
-                ) if category != "All" else None
+                category_id=category_id
             )
 
-            # Add expenses to treeview
-            for expense in expenses['expenses']:
+            # Add expenses to treeview (ID first — hidden column)
+            for expense in expenses:
                 self.expenses_tree.insert("", "end", values=(
+                    expense['id'],
                     expense['date'],
                     expense['category'],
                     f"${expense['amount']:.2f}",
@@ -636,8 +676,8 @@ class ExpenseScreen(ttk.Frame):
 
             # Create or update category
             self.services['expense'].save_category(
-                category_data=category_data,
-                audit_user_id=1  # TODO: Get actual user ID
+                name=name,
+                description=category_data.get('description', '')
             )
 
             messagebox.showinfo("Success", "Category saved successfully!")
@@ -666,10 +706,11 @@ class ExpenseScreen(ttk.Frame):
                 "This will affect all expenses in this category."
         ):
             try:
-                self.services['expense'].delete_category(
-                    category_name=category_name,
-                    audit_user_id=1  # TODO: Get actual user ID
-                )
+                cats = self.services['expense'].get_categories()
+                category_id = next((c['id'] for c in cats if c['name'] == category_name), None)
+                if not category_id:
+                    raise ValueError("Category not found")
+                self.services['expense'].delete_category(category_id=category_id)
 
                 messagebox.showinfo("Success", "Category deleted successfully!")
 
@@ -687,12 +728,10 @@ class ExpenseScreen(ttk.Frame):
             end_date = self.end_date_var.get()
             category = self.category_var.get()
 
-            # Generate report
             report_data = self.services['reporting'].export_report(
-                report_type='expenses',
+                report_type='periodic',
                 start_date=start_date,
                 end_date=end_date,
-                category=category if category != "All" else None,
                 format='csv'
             )
 
@@ -721,7 +760,7 @@ class ExpenseScreen(ttk.Frame):
                 widget.destroy()
 
             # Get analysis data
-            analysis = self.services['expense'].get_category_breakdown(
+            analysis = self.services['expense'].get_expense_summary(
                 start_date=self.analysis_start_var.get(),
                 end_date=self.analysis_end_var.get()
             )
@@ -786,20 +825,19 @@ class ExpenseScreen(ttk.Frame):
     def export_analysis(self):
         """Export current analysis"""
         try:
-            # Generate report
             report_data = self.services['reporting'].export_report(
-                report_type='expense_analysis',
+                report_type='periodic',
                 start_date=self.analysis_start_var.get(),
                 end_date=self.analysis_end_var.get(),
-                format='pdf'
+                format='csv'
             )
 
             # Save file
             import tkinter.filedialog as filedialog
             filename = filedialog.asksaveasfilename(
-                defaultextension=".pdf",
-                filetypes=[("PDF files", "*.pdf")],
-                initialfile=f"expense_analysis_{datetime.now().strftime('%Y%m%d')}.pdf"
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv")],
+                initialfile=f"expense_analysis_{datetime.now().strftime('%Y%m%d')}.csv"
             )
 
             if filename:

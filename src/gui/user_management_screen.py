@@ -1,575 +1,397 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import logging
-from datetime import datetime
 from src.database.models import UserRole
+
+try:
+    from src.gui.styles import (CREAM, CARD_BG, ESPRESSO, MEDIUM_BROWN, DARK_BROWN,
+                                 LIGHT_BROWN, BORDER, TEXT_DARK, TEXT_MID, TEXT_LIGHT,
+                                 SUCCESS, WARNING, DANGER, FONT_H2, FONT_H3,
+                                 FONT_BODY, FONT_SMALL)
+    _HAS_STYLES = True
+except ImportError:
+    _HAS_STYLES = False
 
 logger = logging.getLogger(__name__)
 
 
 class UserManagementScreen(ttk.Frame):
-    def __init__(self, parent, services):
+    def __init__(self, parent, services, user_data=None):
         super().__init__(parent)
         self.parent = parent
         self.services = services
+        self.user_data = user_data or {}
         self.selected_user = None
 
-        # Verify admin access
-        if not self.verify_admin_access():
+        if not self._verify_admin_access():
             messagebox.showerror(
                 "Access Denied",
                 "You do not have permission to access user management."
             )
             return
 
-        self.create_widgets()
-        self.load_users()
+        self._create_widgets()
+        self._load_users()
 
-    def verify_admin_access(self) -> bool:
-        """Verify current user has admin access"""
-        try:
-            # TODO: Get actual user ID from session
-            has_permission, _ = self.services['auth'].check_permission(1, UserRole.ADMIN)
-            return has_permission
-        except Exception as e:
-            logger.error(f"Error verifying admin access: {str(e)}")
-            return False
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+    def _verify_admin_access(self) -> bool:
+        return self.user_data.get('role') == UserRole.ADMIN.value
 
-    def create_widgets(self):
-        """Create and arrange widgets"""
-        # Main heading
-        heading_frame = ttk.Frame(self)
-        heading_frame.pack(fill="x", padx=10, pady=5)
+    def _audit_id(self) -> int:
+        return self.user_data.get('id', 1)
 
-        ttk.Label(
-            heading_frame,
-            text="User Management",
-            font=("Helvetica", 16, "bold")
-        ).pack(side="left")
+    def _get_selected_id(self):
+        if not self.selected_user:
+            messagebox.showwarning("No Selection", "Please select a user first.")
+            return None
+        return int(self.selected_user[0])
 
-        ttk.Button(
-            heading_frame,
-            text="Add User",
-            command=self.show_add_user_dialog
-        ).pack(side="right")
+    # ------------------------------------------------------------------
+    # Widget creation
+    # ------------------------------------------------------------------
+    def _create_widgets(self):
+        bg = CREAM if _HAS_STYLES else "#f0f0f0"
 
-        # Search frame
-        search_frame = ttk.Frame(self)
-        search_frame.pack(fill="x", padx=10, pady=5)
+        # Header
+        hdr = tk.Frame(self, bg=bg, pady=12)
+        hdr.pack(fill="x", padx=20)
+        tk.Label(hdr, text="User Management",
+                 font=FONT_H2 if _HAS_STYLES else ("Helvetica", 16, "bold"),
+                 bg=bg, fg=ESPRESSO if _HAS_STYLES else "black").pack(side="left")
+        ttk.Button(hdr, text="Refresh",
+                   style="Secondary.TButton" if _HAS_STYLES else "TButton",
+                   command=self._load_users).pack(side="right", padx=(0, 6))
+        ttk.Button(hdr, text="+ Add User",
+                   style="Primary.TButton" if _HAS_STYLES else "TButton",
+                   command=self._show_add_dialog).pack(side="right")
 
-        ttk.Label(search_frame, text="Search:").pack(side="left")
-        self.search_var = tk.StringVar()
-        self.search_var.trace('w', lambda *args: self.filter_users())
-        search_entry = ttk.Entry(
-            search_frame,
-            textvariable=self.search_var,
-            width=30
-        )
-        search_entry.pack(side="left", padx=5)
-
-        ttk.Label(search_frame, text="Role:").pack(side="left", padx=(20, 5))
-        self.role_var = tk.StringVar(value="All")
+        # Search bar
+        search_bar = tk.Frame(self, bg=bg)
+        search_bar.pack(fill="x", padx=20, pady=(0, 8))
+        tk.Label(search_bar, text="Search:", bg=bg,
+                 font=FONT_SMALL if _HAS_STYLES else ("Helvetica", 10)).pack(side="left")
+        self._search_var = tk.StringVar()
+        self._search_var.trace_add('write', lambda *_: self._filter())
+        ttk.Entry(search_bar, textvariable=self._search_var, width=28).pack(side="left", padx=5)
+        tk.Label(search_bar, text="Role:", bg=bg,
+                 font=FONT_SMALL if _HAS_STYLES else ("Helvetica", 10)).pack(side="left", padx=(16, 4))
+        self._role_var = tk.StringVar(value="All")
         role_combo = ttk.Combobox(
-            search_frame,
-            textvariable=self.role_var,
-            values=["All"] + [role.value for role in UserRole],
-            state="readonly",
-            width=15
+            search_bar, textvariable=self._role_var,
+            values=["All"] + [r.value for r in UserRole],
+            state="readonly", width=14
         )
-        role_combo.pack(side="left", padx=5)
-        role_combo.bind('<<ComboboxSelected>>', lambda e: self.filter_users())
+        role_combo.pack(side="left")
+        role_combo.bind("<<ComboboxSelected>>", lambda _: self._filter())
 
-        # Create users treeview
-        columns = ("Username", "Email", "Role", "Last Login", "Status")
-        self.users_tree = ttk.Treeview(
-            self,
-            columns=columns,
-            show="headings",
-            selectmode="browse"
+        # Treeview with hidden ID column (col 0)
+        tree_frame = tk.Frame(self, bg=bg)
+        tree_frame.pack(fill="both", expand=True, padx=20, pady=(0, 8))
+
+        cols = ("ID", "Username", "Email", "Role", "Last Login", "Status")
+        self._tree = ttk.Treeview(
+            tree_frame, columns=cols, show="headings", selectmode="browse"
         )
+        self._tree.heading("ID", text="ID")
+        self._tree.column("ID", width=0, minwidth=0, stretch=False)
+        for col, w in [("Username", 150), ("Email", 230), ("Role", 100),
+                       ("Last Login", 160), ("Status", 80)]:
+            self._tree.heading(col, text=col)
+            self._tree.column(col, width=w)
 
-        # Configure columns
-        self.users_tree.heading("Username", text="Username")
-        self.users_tree.column("Username", width=150)
-        self.users_tree.heading("Email", text="Email")
-        self.users_tree.column("Email", width=200)
-        self.users_tree.heading("Role", text="Role")
-        self.users_tree.column("Role", width=100)
-        self.users_tree.heading("Last Login", text="Last Login")
-        self.users_tree.column("Last Login", width=150)
-        self.users_tree.heading("Status", text="Status")
-        self.users_tree.column("Status", width=100)
+        sb = ttk.Scrollbar(tree_frame, orient="vertical", command=self._tree.yview)
+        self._tree.configure(yscrollcommand=sb.set)
+        self._tree.pack(side="left", fill="both", expand=True)
+        sb.pack(side="right", fill="y")
 
-        # Add scrollbar
-        scrollbar = ttk.Scrollbar(
-            self,
-            orient="vertical",
-            command=self.users_tree.yview
-        )
-        self.users_tree.configure(yscrollcommand=scrollbar.set)
+        self._tree.bind("<<TreeviewSelect>>", self._on_select)
+        self._tree.bind("<Double-1>", lambda e: self._show_edit_dialog())
 
-        # Pack treeview and scrollbar
-        self.users_tree.pack(side="left", fill="both", expand=True, padx=10, pady=5)
-        scrollbar.pack(side="right", fill="y", pady=5)
+        # Action buttons
+        btn_row = tk.Frame(self, bg=bg)
+        btn_row.pack(fill="x", padx=20, pady=(0, 14))
+        ttk.Button(btn_row, text="Edit User",
+                   style="Secondary.TButton" if _HAS_STYLES else "TButton",
+                   command=self._show_edit_dialog).pack(side="left", padx=(0, 6))
+        ttk.Button(btn_row, text="Reset Password",
+                   style="Secondary.TButton" if _HAS_STYLES else "TButton",
+                   command=self._show_reset_password_dialog).pack(side="left", padx=(0, 6))
+        ttk.Button(btn_row, text="Toggle Active/Inactive",
+                   style="Secondary.TButton" if _HAS_STYLES else "TButton",
+                   command=self._toggle_status).pack(side="left")
 
-        # Bind events
-        self.users_tree.bind("<Button-3>", self.show_context_menu)
-        self.users_tree.bind("<Double-1>", self.show_user_details)
-
-        # Create context menu
-        self.context_menu = tk.Menu(self, tearoff=0)
-        self.context_menu.add_command(label="Edit User", command=self.show_edit_dialog)
-        self.context_menu.add_command(label="Change Password", command=self.show_change_password_dialog)
-        self.context_menu.add_separator()
-        self.context_menu.add_command(label="Activate/Deactivate", command=self.toggle_user_status)
-        self.context_menu.add_command(label="Reset Password", command=self.reset_user_password)
-
-        # Pack main frame
         self.pack(fill="both", expand=True)
 
-    def load_users(self):
-        """Load users into treeview"""
+    # ------------------------------------------------------------------
+    # Data loading
+    # ------------------------------------------------------------------
+    def _on_select(self, event=None):
+        sel = self._tree.selection()
+        if sel:
+            self.selected_user = self._tree.item(sel[0])['values']
+
+    def _load_users(self):
+        for row in self._tree.get_children():
+            self._tree.delete(row)
         try:
-            # Clear existing items
-            for item in self.users_tree.get_children():
-                self.users_tree.delete(item)
-
-            # Get users
-            users = self.services['user'].get_users()
-
-            # Add users to treeview
-            for user in users:
-                self.users_tree.insert("", "end", values=(
-                    user['username'],
-                    user['email'],
-                    user['role'],
-                    user['last_login'] if user['last_login'] else "Never",
-                    "Active" if user['is_active'] else "Inactive"
+            users = self.services['user'].get_all_users()
+            for u in users:
+                last = u['last_login'] if u['last_login'] else "Never"
+                self._tree.insert("", "end", values=(
+                    u['id'], u['username'], u['email'], u['role'],
+                    last, "Active" if u['is_active'] else "Inactive"
                 ))
-
         except Exception as e:
-            logger.error(f"Error loading users: {str(e)}")
+            logger.error(f"Error loading users: {e}")
             messagebox.showerror("Error", "Failed to load users")
 
-    def filter_users(self):
-        """Filter users based on search term and role"""
+    def _filter(self):
+        term = self._search_var.get().lower()
+        role_f = self._role_var.get()
+        for row in self._tree.get_children():
+            self._tree.delete(row)
         try:
-            search_term = self.search_var.get().lower()
-            role_filter = self.role_var.get()
-
-            # Show all items first
-            for item in self.users_tree.get_children():
-                self.users_tree.item(item, tags=())
-
-            # Apply filters
-            for item in self.users_tree.get_children():
-                values = self.users_tree.item(item)['values']
-                username = str(values[0]).lower()
-                email = str(values[1]).lower()
-                role = str(values[2])
-
-                show_item = True
-
-                # Apply search filter
-                if search_term and search_term not in username and search_term not in email:
-                    show_item = False
-
-                # Apply role filter
-                if role_filter != "All" and role_filter != role:
-                    show_item = False
-
-                # Hide or show item
-                if show_item:
-                    self.users_tree.item(item, tags=())
-                else:
-                    self.users_tree.detach(item)
-
+            users = self.services['user'].get_all_users()
+            for u in users:
+                if term and term not in u['username'].lower() and term not in u['email'].lower():
+                    continue
+                if role_f != "All" and role_f != u['role']:
+                    continue
+                last = u['last_login'] if u['last_login'] else "Never"
+                self._tree.insert("", "end", values=(
+                    u['id'], u['username'], u['email'], u['role'],
+                    last, "Active" if u['is_active'] else "Inactive"
+                ))
         except Exception as e:
-            logger.error(f"Error filtering users: {str(e)}")
+            logger.error(f"Filter error: {e}")
 
-    def show_context_menu(self, event):
-        """Show context menu for selected user"""
-        item = self.users_tree.identify_row(event.y)
-        if item:
-            self.users_tree.selection_set(item)
-            self.selected_user = self.users_tree.item(item)['values']
-            self.context_menu.post(event.x_root, event.y_root)
+    # ------------------------------------------------------------------
+    # Dialogs
+    # ------------------------------------------------------------------
+    def _dialog_header(self, dlg, title_text):
+        bg_h = MEDIUM_BROWN if _HAS_STYLES else "#8B5E3C"
+        hdr = tk.Frame(dlg, bg=bg_h, pady=10)
+        hdr.pack(fill="x")
+        tk.Label(hdr, text=title_text,
+                 font=FONT_H3 if _HAS_STYLES else ("Helvetica", 12, "bold"),
+                 bg=bg_h, fg="white").pack()
 
-    def show_user_details(self, event=None):
-        """Show details for selected user"""
-        if not self.selected_user:
-            return
+    def _show_add_dialog(self):
+        bg = CREAM if _HAS_STYLES else "#f0f0f0"
+        dlg = tk.Toplevel(self)
+        dlg.title("Add User")
+        dlg.geometry("400x420")
+        dlg.resizable(False, False)
+        dlg.configure(bg=bg)
+        dlg.grab_set()
 
-        dialog = tk.Toplevel(self)
-        dialog.title("User Details")
-        dialog.geometry("400x300")
-        dialog.grab_set()
+        self._dialog_header(dlg, "Create New User")
 
-        # Get full user details
-        user = self.services['user'].get_user_details(self.selected_user[0])
-        if user:
-            # Create details view
-            details_frame = ttk.Frame(dialog, padding="20")
-            details_frame.pack(fill="both", expand=True)
+        body = tk.Frame(dlg, bg=bg, padx=24, pady=16)
+        body.pack(fill="both", expand=True)
 
-            # Display user details
-            details = [
-                ("Username:", user['username']),
-                ("Email:", user['email']),
-                ("Role:", user['role']),
-                ("Status:", "Active" if user['is_active'] else "Inactive"),
-                ("Last Login:", user['last_login'] if user['last_login'] else "Never"),
-                ("Created At:", user['created_at'])
-            ]
+        def lbl(text):
+            tk.Label(body, text=text, bg=bg,
+                     font=FONT_SMALL if _HAS_STYLES else ("Helvetica", 10)).pack(anchor="w", pady=(8, 2))
 
-            for i, (label, value) in enumerate(details):
-                ttk.Label(
-                    details_frame,
-                    text=label,
-                    font=("Helvetica", 10, "bold")
-                ).grid(row=i, column=0, sticky="e", padx=5, pady=5)
-                ttk.Label(
-                    details_frame,
-                    text=value
-                ).grid(row=i, column=1, sticky="w", padx=5, pady=5)
+        lbl("Username")
+        username_entry = ttk.Entry(body)
+        username_entry.pack(fill="x", ipady=3)
 
-            # Add close button
-            ttk.Button(
-                dialog,
-                text="Close",
-                command=dialog.destroy
-            ).pack(pady=10)
+        lbl("Email")
+        email_entry = ttk.Entry(body)
+        email_entry.pack(fill="x", ipady=3)
 
-    def show_add_user_dialog(self):
-        """Show dialog to add new user"""
-        dialog = tk.Toplevel(self)
-        dialog.title("Add User")
-        dialog.geometry("400x500")
-        dialog.grab_set()
+        lbl("Password")
+        pw_entry = ttk.Entry(body, show="*")
+        pw_entry.pack(fill="x", ipady=3)
 
-        # Create user form
-        form_frame = ttk.Frame(dialog, padding="20")
-        form_frame.pack(fill="both", expand=True)
-
-        # Username field
-        ttk.Label(form_frame, text="Username:").pack(anchor="w", pady=(0, 5))
-        username_var = tk.StringVar()
-        ttk.Entry(
-            form_frame,
-            textvariable=username_var,
-            width=40
-        ).pack(fill="x", pady=(0, 10))
-
-        # Email field
-        ttk.Label(form_frame, text="Email:").pack(anchor="w", pady=(0, 5))
-        email_var = tk.StringVar()
-        ttk.Entry(
-            form_frame,
-            textvariable=email_var,
-            width=40
-        ).pack(fill="x", pady=(0, 10))
-
-        # Password field
-        ttk.Label(form_frame, text="Password:").pack(anchor="w", pady=(0, 5))
-        password_var = tk.StringVar()
-        ttk.Entry(
-            form_frame,
-            textvariable=password_var,
-            show="*",
-            width=40
-        ).pack(fill="x", pady=(0, 10))
-
-        # Confirm password field
-        ttk.Label(form_frame, text="Confirm Password:").pack(anchor="w", pady=(0, 5))
-        confirm_password_var = tk.StringVar()
-        ttk.Entry(
-            form_frame,
-            textvariable=confirm_password_var,
-            show="*",
-            width=40
-        ).pack(fill="x", pady=(0, 10))
-
-        # Role selection
-        ttk.Label(form_frame, text="Role:").pack(anchor="w", pady=(0, 5))
+        lbl("Role")
         role_var = tk.StringVar(value=UserRole.STAFF.value)
-        for role in UserRole:
-            ttk.Radiobutton(
-                form_frame,
-                text=role.value.capitalize(),
-                value=role.value,
-                variable=role_var
-            ).pack(anchor="w")
+        role_row = tk.Frame(body, bg=bg)
+        role_row.pack(anchor="w", pady=(4, 0))
+        for r in UserRole:
+            ttk.Radiobutton(role_row, text=r.value.capitalize(),
+                            value=r.value, variable=role_var).pack(side="left", padx=4)
 
-        def save_user():
+        username_entry.focus()
+
+        def save():
+            u = username_entry.get().strip()
+            e = email_entry.get().strip()
+            p = pw_entry.get()
+            if not all([u, e, p]):
+                messagebox.showerror("Error", "All fields are required", parent=dlg)
+                return
             try:
-                # Get form data
-                username = username_var.get().strip()
-                email = email_var.get().strip()
-                password = password_var.get()
-                confirm_password = confirm_password_var.get()
-                role = UserRole(role_var.get())
-
-                # Validate inputs
-                if not all([username, email, password, confirm_password]):
-                    raise ValueError("All fields are required")
-
-                if password != confirm_password:
-                    raise ValueError("Passwords do not match")
-
-                # Create user
                 self.services['user'].create_user(
-                    username=username,
-                    email=email,
-                    password=password,
-                    role=role
+                    username=u, email=e, password=p, role=UserRole(role_var.get()),
+                    audit_user_id=self._audit_id()
                 )
+                messagebox.showinfo("Success", f"User '{u}' created successfully!", parent=dlg)
+                dlg.destroy()
+                self._load_users()
+            except Exception as ex:
+                logger.error(f"Create user error: {ex}")
+                messagebox.showerror("Error", str(ex) or "Failed to create user", parent=dlg)
 
-                messagebox.showinfo("Success", "User created successfully!")
-                dialog.destroy()
+        btn_row = tk.Frame(body, bg=bg)
+        btn_row.pack(fill="x", pady=(16, 0))
+        ttk.Button(btn_row, text="Cancel",
+                   style="Secondary.TButton" if _HAS_STYLES else "TButton",
+                   command=dlg.destroy).pack(side="left")
+        ttk.Button(btn_row, text="Create User",
+                   style="Primary.TButton" if _HAS_STYLES else "TButton",
+                   command=save).pack(side="right")
+        dlg.bind("<Return>", lambda _: save())
 
-                # Refresh users list
-                self.load_users()
-
-            except ValueError as e:
-                messagebox.showerror("Error", str(e))
-            except Exception as e:
-                logger.error(f"Error creating user: {str(e)}")
-                messagebox.showerror("Error", "Failed to create user")
-
-        # Add save button
-        ttk.Button(
-            form_frame,
-            text="Save",
-            command=save_user
-        ).pack(pady=20)
-
-    def show_edit_dialog(self):
-        """Show dialog to edit selected user"""
-        if not self.selected_user:
+    def _show_edit_dialog(self):
+        uid = self._get_selected_id()
+        if uid is None:
+            return
+        try:
+            user = self.services['user'].get_user_by_id(uid)
+        except Exception as e:
+            logger.error(f"Get user error: {e}")
+            messagebox.showerror("Error", "Could not load user details")
             return
 
-        dialog = tk.Toplevel(self)
-        dialog.title("Edit User")
-        dialog.geometry("400x400")
-        dialog.grab_set()
+        bg = CREAM if _HAS_STYLES else "#f0f0f0"
+        dlg = tk.Toplevel(self)
+        dlg.title("Edit User")
+        dlg.geometry("400x320")
+        dlg.resizable(False, False)
+        dlg.configure(bg=bg)
+        dlg.grab_set()
 
-        # Get user details
-        user = self.services['user'].get_user_details(self.selected_user[0])
+        self._dialog_header(dlg, f"Edit: {user['username']}")
 
-        # Create edit form
-        form_frame = ttk.Frame(dialog, padding="20")
-        form_frame.pack(fill="both", expand=True)
+        body = tk.Frame(dlg, bg=bg, padx=24, pady=16)
+        body.pack(fill="both", expand=True)
 
-        # Username field (read-only)
-        ttk.Label(form_frame, text="Username:").pack(anchor="w", pady=(0, 5))
-        username_var = tk.StringVar(value=user['username'])
-        ttk.Entry(
-            form_frame,
-            textvariable=username_var,
-            state="readonly",
-            width=40
-        ).pack(fill="x", pady=(0, 10))
-
-        # Email field
-        ttk.Label(form_frame, text="Email:").pack(anchor="w", pady=(0, 5))
+        tk.Label(body, text="Email:", bg=bg,
+                 font=FONT_SMALL if _HAS_STYLES else ("Helvetica", 10)).pack(anchor="w", pady=(0, 2))
         email_var = tk.StringVar(value=user['email'])
-        ttk.Entry(
-            form_frame,
-            textvariable=email_var,
-            width=40
-        ).pack(fill="x", pady=(0, 10))
+        ttk.Entry(body, textvariable=email_var).pack(fill="x", ipady=3)
 
-        # Role selection
-        ttk.Label(form_frame, text="Role:").pack(anchor="w", pady=(0, 5))
+        tk.Label(body, text="Role:", bg=bg,
+                 font=FONT_SMALL if _HAS_STYLES else ("Helvetica", 10)).pack(anchor="w", pady=(12, 2))
         role_var = tk.StringVar(value=user['role'])
-        for role in UserRole:
-            ttk.Radiobutton(
-                form_frame,
-                text=role.value.capitalize(),
-                value=role.value,
-                variable=role_var
-            ).pack(anchor="w")
+        role_row = tk.Frame(body, bg=bg)
+        role_row.pack(anchor="w")
+        for r in UserRole:
+            ttk.Radiobutton(role_row, text=r.value.capitalize(),
+                            value=r.value, variable=role_var).pack(side="left", padx=4)
 
-        def save_changes():
+        def save():
+            e = email_var.get().strip()
+            if not e:
+                messagebox.showerror("Error", "Email is required", parent=dlg)
+                return
             try:
-                # Get form data
-                email = email_var.get().strip()
-                role = UserRole(role_var.get())
-
-                # Validate inputs
-                if not email:
-                    raise ValueError("Email is required")
-
-                # Update user
                 self.services['user'].update_user(
-                    user_id=user['id'],
-                    update_data={
-                        'email': email,
-                        'role': role
-                    },
-                    audit_user_id=1  # TODO: Get actual user ID
+                    user_id=uid,
+                    update_data={'email': e, 'role': UserRole(role_var.get())},
+                    audit_user_id=self._audit_id()
                 )
+                messagebox.showinfo("Success", "User updated successfully!", parent=dlg)
+                dlg.destroy()
+                self._load_users()
+            except Exception as ex:
+                logger.error(f"Update user error: {ex}")
+                messagebox.showerror("Error", str(ex) or "Failed to update user", parent=dlg)
 
-                messagebox.showinfo("Success", "User updated successfully!")
-                dialog.destroy()
+        btn_row = tk.Frame(body, bg=bg)
+        btn_row.pack(fill="x", pady=(20, 0))
+        ttk.Button(btn_row, text="Cancel",
+                   style="Secondary.TButton" if _HAS_STYLES else "TButton",
+                   command=dlg.destroy).pack(side="left")
+        ttk.Button(btn_row, text="Save Changes",
+                   style="Primary.TButton" if _HAS_STYLES else "TButton",
+                   command=save).pack(side="right")
 
-                # Refresh users list
-                self.load_users()
+    def _show_reset_password_dialog(self):
+        uid = self._get_selected_id()
+        if uid is None:
+            return
 
-            except ValueError as e:
-                messagebox.showerror("Error", str(e))
-            except Exception as e:
-                logger.error(f"Error updating user: {str(e)}")
-                messagebox.showerror("Error", "Failed to update user")
+        bg = CREAM if _HAS_STYLES else "#f0f0f0"
+        dlg = tk.Toplevel(self)
+        dlg.title("Reset Password")
+        dlg.geometry("360x260")
+        dlg.resizable(False, False)
+        dlg.configure(bg=bg)
+        dlg.grab_set()
 
-                # Add save button
-            ttk.Button(
-                form_frame,
-                text="Save Changes",
-                command=save_changes
-            ).pack(pady=20)
+        username = self.selected_user[1] if self.selected_user else ""
+        self._dialog_header(dlg, f"Reset: {username}")
 
-            def show_change_password_dialog(self):
-                """Show dialog to change user's password"""
-                if not self.selected_user:
-                    return
+        body = tk.Frame(dlg, bg=bg, padx=24, pady=16)
+        body.pack(fill="both", expand=True)
 
-                dialog = tk.Toplevel(self)
-                dialog.title("Change Password")
-                dialog.geometry("400x300")
-                dialog.grab_set()
+        tk.Label(body, text="New Password:", bg=bg,
+                 font=FONT_SMALL if _HAS_STYLES else ("Helvetica", 10)).pack(anchor="w", pady=(0, 2))
+        pw_entry = ttk.Entry(body, show="*")
+        pw_entry.pack(fill="x", ipady=3)
+        pw_entry.focus()
 
-                # Create password form
-                form_frame = ttk.Frame(dialog, padding="20")
-                form_frame.pack(fill="both", expand=True)
+        tk.Label(body, text="Confirm Password:", bg=bg,
+                 font=FONT_SMALL if _HAS_STYLES else ("Helvetica", 10)).pack(anchor="w", pady=(10, 2))
+        cpw_entry = ttk.Entry(body, show="*")
+        cpw_entry.pack(fill="x", ipady=3)
 
-                ttk.Label(
-                    form_frame,
-                    text=f"Change Password for {self.selected_user[0]}",
-                    font=("Helvetica", 12, "bold")
-                ).pack(pady=(0, 20))
+        def save():
+            p, cp = pw_entry.get(), cpw_entry.get()
+            if not p:
+                messagebox.showerror("Error", "Password cannot be empty", parent=dlg)
+                return
+            if p != cp:
+                messagebox.showerror("Error", "Passwords do not match", parent=dlg)
+                return
+            try:
+                self.services['user'].admin_reset_password(
+                    user_id=uid, new_password=p, audit_user_id=self._audit_id()
+                )
+                messagebox.showinfo("Success", "Password reset successfully!", parent=dlg)
+                dlg.destroy()
+            except Exception as ex:
+                logger.error(f"Reset password error: {ex}")
+                messagebox.showerror("Error", str(ex) or "Failed to reset password", parent=dlg)
 
-                # New password field
-                ttk.Label(form_frame, text="New Password:").pack(anchor="w", pady=(0, 5))
-                password_var = tk.StringVar()
-                ttk.Entry(
-                    form_frame,
-                    textvariable=password_var,
-                    show="*",
-                    width=40
-                ).pack(fill="x", pady=(0, 10))
+        btn_row = tk.Frame(body, bg=bg)
+        btn_row.pack(fill="x", pady=(16, 0))
+        ttk.Button(btn_row, text="Cancel",
+                   style="Secondary.TButton" if _HAS_STYLES else "TButton",
+                   command=dlg.destroy).pack(side="left")
+        ttk.Button(btn_row, text="Reset Password",
+                   style="Danger.TButton" if _HAS_STYLES else "TButton",
+                   command=save).pack(side="right")
+        dlg.bind("<Return>", lambda _: save())
 
-                # Confirm password field
-                ttk.Label(form_frame, text="Confirm Password:").pack(anchor="w", pady=(0, 5))
-                confirm_password_var = tk.StringVar()
-                ttk.Entry(
-                    form_frame,
-                    textvariable=confirm_password_var,
-                    show="*",
-                    width=40
-                ).pack(fill="x", pady=(0, 10))
-
-                def change_password():
-                    try:
-                        # Get passwords
-                        password = password_var.get()
-                        confirm_password = confirm_password_var.get()
-
-                        # Validate inputs
-                        if not password or not confirm_password:
-                            raise ValueError("All fields are required")
-
-                        if password != confirm_password:
-                            raise ValueError("Passwords do not match")
-
-                        # Update password
-                        self.services['user'].update_password(
-                            user_id=self.selected_user[0],
-                            new_password=password,
-                            audit_user_id=1  # TODO: Get actual user ID
-                        )
-
-                        messagebox.showinfo("Success", "Password changed successfully!")
-                        dialog.destroy()
-
-                    except ValueError as e:
-                        messagebox.showerror("Error", str(e))
-                    except Exception as e:
-                        logger.error(f"Error changing password: {str(e)}")
-                        messagebox.showerror("Error", "Failed to change password")
-
-                # Add save button
-                ttk.Button(
-                    form_frame,
-                    text="Change Password",
-                    command=change_password
-                ).pack(pady=20)
-
-            def reset_user_password(self):
-                """Reset user's password and send email"""
-                if not self.selected_user:
-                    return
-
-                if messagebox.askyesno(
-                        "Confirm Reset",
-                        f"Are you sure you want to reset the password for {self.selected_user[0]}?\n"
-                        "A reset link will be sent to their email address."
-                ):
-                    try:
-                        # Initiate password reset
-                        self.services['user'].initiate_password_reset(
-                            email=self.selected_user[1]
-                        )
-
-                        messagebox.showinfo(
-                            "Success",
-                            "Password reset link has been sent to the user's email."
-                        )
-
-                    except Exception as e:
-                        logger.error(f"Error resetting password: {str(e)}")
-                        messagebox.showerror("Error", "Failed to reset password")
-
-            def toggle_user_status(self):
-                """Activate or deactivate selected user"""
-                if not self.selected_user:
-                    return
-
-                current_status = self.selected_user[4]  # "Active" or "Inactive"
-                new_status = "deactivate" if current_status == "Active" else "activate"
-
-                if messagebox.askyesno(
-                        "Confirm Status Change",
-                        f"Are you sure you want to {new_status} user {self.selected_user[0]}?"
-                ):
-                    try:
-                        if new_status == "deactivate":
-                            self.services['user'].deactivate_user(
-                                user_id=self.selected_user[0],
-                                audit_user_id=1  # TODO: Get actual user ID
-                            )
-                        else:
-                            self.services['user'].reactivate_user(
-                                user_id=self.selected_user[0],
-                                audit_user_id=1  # TODO: Get actual user ID
-                            )
-
-                        messagebox.showinfo(
-                            "Success",
-                            f"User {new_status}d successfully!"
-                        )
-
-                        # Refresh users list
-                        self.load_users()
-
-                    except Exception as e:
-                        logger.error(f"Error changing user status: {str(e)}")
-                        messagebox.showerror("Error", f"Failed to {new_status} user")
-
-            def refresh(self):
-                """Refresh the user list"""
-                self.load_users()
-
-            def cleanup(self):
-                """Clean up resources"""
-                pass
+    def _toggle_status(self):
+        uid = self._get_selected_id()
+        if uid is None:
+            return
+        status = str(self.selected_user[5])   # "Active" or "Inactive"
+        username = str(self.selected_user[1])
+        action = "deactivate" if status == "Active" else "reactivate"
+        if not messagebox.askyesno(
+            "Confirm", f"Are you sure you want to {action} user '{username}'?"
+        ):
+            return
+        try:
+            if action == "deactivate":
+                self.services['user'].deactivate_user(
+                    user_id=uid, audit_user_id=self._audit_id()
+                )
+            else:
+                self.services['user'].reactivate_user(
+                    user_id=uid, audit_user_id=self._audit_id()
+                )
+            messagebox.showinfo("Success", f"User {action}d successfully!")
+            self._load_users()
+        except Exception as e:
+            logger.error(f"Toggle status error: {e}")
+            messagebox.showerror("Error", f"Failed to {action} user")

@@ -17,7 +17,8 @@ class UserService:
         self.user_dao = UserDAO(session)
 
     def register_user(self, username: str, email: str, password: str,
-                      role: UserRole = UserRole.STAFF) -> Dict:
+                      role: UserRole = UserRole.STAFF,
+                      audit_user_id: int = None) -> Dict:
         """Register a new user with validation"""
         try:
             # Validate input
@@ -42,7 +43,8 @@ class UserService:
 
             # Create user
             hashed_password = hash_password(password)
-            user = self.user_dao.create_user(username, email, hashed_password, role)
+            user = self.user_dao.create_user(username, email, hashed_password, role,
+                                              audit_user_id=audit_user_id)
 
             logger.info(f"Successfully registered new user: {username}")
 
@@ -164,6 +166,71 @@ class UserService:
         except Exception as e:
             logger.error(f"Password change failed: {str(e)}")
             raise
+
+    def get_all_users(self, search_term: str = None, role: UserRole = None) -> List[Dict]:
+        """Get all users, optionally filtered"""
+        try:
+            users = self.user_dao.get_users(search_term=search_term, role=role)
+            return [self._user_to_dict(u) for u in users]
+        except Exception as e:
+            logger.error(f"Failed to get users: {str(e)}")
+            raise
+
+    def get_user_by_id(self, user_id: int) -> Optional[Dict]:
+        """Get a single user by ID"""
+        try:
+            user = self.user_dao.get_user_by_id(user_id)
+            return self._user_to_dict(user) if user else None
+        except Exception as e:
+            logger.error(f"Failed to get user: {str(e)}")
+            raise
+
+    def create_user(self, username: str, email: str, password: str,
+                    role: UserRole = UserRole.STAFF,
+                    audit_user_id: int = None) -> Dict:
+        """Create a new user (admin action, skips password strength check)."""
+        return self.register_user(username, email, password, role,
+                                  audit_user_id=audit_user_id)
+
+    def update_user(self, user_id: int, update_data: Dict, audit_user_id: int) -> Optional[Dict]:
+        """Update user data (admin action)"""
+        return self.update_user_profile(user_id, update_data, audit_user_id)
+
+    def admin_reset_password(self, user_id: int, new_password: str, audit_user_id: int) -> bool:
+        """Reset a user's password (admin action, no current-password check)"""
+        try:
+            new_hash = hash_password(new_password)
+            return self.user_dao.update_password(user_id, new_hash, audit_user_id)
+        except Exception as e:
+            logger.error(f"Admin password reset failed: {str(e)}")
+            raise
+
+    def deactivate_user(self, user_id: int, audit_user_id: int) -> bool:
+        """Deactivate a user account"""
+        try:
+            return self.user_dao.deactivate_user(user_id, audit_user_id)
+        except Exception as e:
+            logger.error(f"Deactivate user failed: {str(e)}")
+            raise
+
+    def reactivate_user(self, user_id: int, audit_user_id: int) -> bool:
+        """Reactivate a user account"""
+        try:
+            return self.user_dao.reactivate_user(user_id, audit_user_id)
+        except Exception as e:
+            logger.error(f"Reactivate user failed: {str(e)}")
+            raise
+
+    def _user_to_dict(self, user) -> Dict:
+        return {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'role': user.role.value,
+            'is_active': user.is_active,
+            'last_login': user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else None,
+            'created_at': user.created_at.isoformat() if user.created_at else None,
+        }
 
     def update_user_profile(self, user_id: int, update_data: Dict,
                             audit_user_id: int) -> Optional[Dict]:
