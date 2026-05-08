@@ -40,9 +40,12 @@ class ExpenseDAO:
 
     def get_expenses_by_date_range(self, start_date: date, end_date: date,
                                    user_id: Optional[int] = None) -> List[Expense]:
-        """Get expenses within a date range"""
+        """Get expenses within a date range (inclusive on both ends)."""
         query = self.session.query(Expense).filter(
-            Expense.date.between(start_date, end_date)
+            and_(
+                func.date(Expense.date) >= start_date,
+                func.date(Expense.date) <= end_date
+            )
         )
 
         if user_id:
@@ -57,15 +60,24 @@ class ExpenseDAO:
         query = self.session.query(Expense).filter_by(category_id=category_id)
 
         if start_date and end_date:
-            query = query.filter(Expense.date.between(start_date, end_date))
+            query = query.filter(
+                and_(
+                    func.date(Expense.date) >= start_date,
+                    func.date(Expense.date) <= end_date
+                )
+            )
 
         return query.order_by(Expense.date.desc()).all()
 
     def get_total_expenses(self, start_date: date, end_date: date,
                            category_id: Optional[int] = None) -> float:
         """Get total expenses for a date range and optional category"""
-        query = self.session.query(func.sum(Expense.amount)) \
-            .filter(Expense.date.between(start_date, end_date))
+        query = self.session.query(func.sum(Expense.amount)).filter(
+            and_(
+                func.date(Expense.date) >= start_date,
+                func.date(Expense.date) <= end_date
+            )
+        )
 
         if category_id:
             query = query.filter_by(category_id=category_id)
@@ -123,10 +135,12 @@ class ExpenseDAO:
             Category.name,
             func.sum(Expense.amount).label('total_amount'),
             func.count(Expense.id).label('transaction_count')
-        ).join(Category) \
-            .filter(Expense.date.between(start_date, end_date)) \
-            .group_by(Category.name) \
-            .all()
+        ).join(Category).filter(
+            and_(
+                func.date(Expense.date) >= start_date,
+                func.date(Expense.date) <= end_date
+            )
+        ).group_by(Category.name).all()
 
         return [
             {

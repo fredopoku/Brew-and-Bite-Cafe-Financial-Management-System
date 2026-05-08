@@ -133,8 +133,10 @@ class LoginWindow:
 
     def login(self):
         """Handle login attempt"""
-        username = self.username_var.get().strip()
-        password = self.password_var.get().strip()
+        # Read directly from Entry widgets — StringVar.get() can return ""
+        # on macOS inside a focused window before the event loop settles
+        username = self.username_entry.get().strip()
+        password = self.password_entry.get().strip()
 
         if not username or not password:
             messagebox.showerror("Error", "Please enter both username and password")
@@ -145,11 +147,13 @@ class LoginWindow:
 
             if success and user_data:
                 logger.info(f"User logged in successfully: {username}")
-                self.root.withdraw()  # Hide login window
-                MainWindow(user_data, self.auth_service)  # Open main window
+                self.root.withdraw()
+                main_win = MainWindow(user_data)
+                main_win.run()
             else:
                 messagebox.showerror("Login Failed", error or "Invalid login attempt")
-                self.password_var.set("")  # Clear password field
+                self.password_entry.delete(0, "end")
+                self.password_entry.focus()
 
         except Exception as e:
             logger.error(f"Login error: {str(e)}")
@@ -177,7 +181,7 @@ class LoginWindow:
         email_entry.pack(padx=20, fill="x")
 
         def request_reset():
-            email = email_var.get().strip()
+            email = email_entry.get().strip()
             if not email:
                 messagebox.showerror("Error", "Please enter your email address")
                 return

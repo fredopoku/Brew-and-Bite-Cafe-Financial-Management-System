@@ -41,6 +41,7 @@ class BarChart(tk.Canvas):
     def set_data(self, data: list):
         """Replace chart data and redraw. data = [(label, value), ...]"""
         self._data = list(data)
+        self.update_idletasks()  # ensure canvas has been laid out before drawing
         self._draw()
 
     # ------------------------------------------------------------------
