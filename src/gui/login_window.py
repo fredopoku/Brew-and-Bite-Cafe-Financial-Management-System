@@ -149,17 +149,21 @@ class LoginWindow:
         fgt.pack(side="right")
         fgt.bind("<Button-1>", lambda _: self.show_reset_password())
 
-        # Sign-in button
+        # Sign-in button — use tk.Label so macOS Aqua cannot override the colour
         tk.Frame(wrap, bg=CARD_BG, height=18).pack()
-        btn = tk.Button(wrap, text="Sign In",
-                        font=("Helvetica", 12, "bold"),
-                        bg=MEDIUM_BROWN, fg=CARD_BG,
-                        activebackground=DARK_BROWN, activeforeground=CARD_BG,
-                        relief="flat", bd=0, cursor="hand2",
-                        command=self._do_login)
-        btn.pack(fill="x", ipady=11)
-        btn.bind("<Enter>", lambda _: btn.configure(bg=DARK_BROWN))
-        btn.bind("<Leave>", lambda _: btn.configure(bg=MEDIUM_BROWN))
+        btn_frame = tk.Frame(wrap, bg=MEDIUM_BROWN, cursor="hand2")
+        btn_frame.pack(fill="x")
+        btn_lbl = tk.Label(btn_frame, text="Sign In",
+                           font=("Helvetica", 12, "bold"),
+                           bg=MEDIUM_BROWN, fg=CARD_BG,
+                           cursor="hand2", pady=12)
+        btn_lbl.pack(fill="x")
+        for w in (btn_frame, btn_lbl):
+            w.bind("<Button-1>", lambda _: self._do_login())
+            w.bind("<Enter>",    lambda _: (btn_frame.configure(bg=DARK_BROWN),
+                                            btn_lbl.configure(bg=DARK_BROWN)))
+            w.bind("<Leave>",    lambda _: (btn_frame.configure(bg=MEDIUM_BROWN),
+                                            btn_lbl.configure(bg=MEDIUM_BROWN)))
 
         self.username_entry.focus()
 
