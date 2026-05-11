@@ -49,11 +49,17 @@ class MainWindow:
     # ------------------------------------------------------------------
     def setup_window(self):
         self.root.title("Brew and Bite Café — Management System")
-        self.root.geometry("1200x780")
+        self.root.resizable(True, True)
         self.root.minsize(900, 620)
         self.root.configure(bg=CREAM)
         self.root.grid_columnconfigure(1, weight=1)
         self.root.grid_rowconfigure(0, weight=1)
+
+        # Start maximised — fills screen but keeps macOS menu bar / Dock
+        self.root.update_idletasks()
+        sw = self.root.winfo_screenwidth()
+        sh = self.root.winfo_screenheight()
+        self.root.geometry(f"{sw}x{sh}+0+0")
 
     def create_services(self):
         try:
