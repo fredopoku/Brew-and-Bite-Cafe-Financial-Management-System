@@ -58,7 +58,7 @@ class LoginWindow:
         icon_frame = tk.Frame(panel, bg=DARK_BROWN, width=90, height=90)
         icon_frame.pack()
         icon_frame.pack_propagate(False)
-        tk.Label(icon_frame, text="☕", font=("Helvetica", 44),
+        tk.Label(icon_frame, text="B&B", font=("Helvetica", 20, "bold"),
                  bg=DARK_BROWN, fg=CARD_BG).place(relx=0.5, rely=0.5, anchor="center")
 
         tk.Frame(panel, bg=ESPRESSO, height=18).pack()
@@ -81,10 +81,10 @@ class LoginWindow:
         tk.Frame(panel, bg=ESPRESSO, height=26).pack()
 
         for feat in (
-            "✓   Sales & POS tracking",
-            "✓   Expense management",
-            "✓   Inventory control",
-            "✓   Financial analytics",
+            "—   Sales & POS tracking",
+            "—   Expense management",
+            "—   Inventory control",
+            "—   Financial analytics",
         ):
             tk.Label(panel, text=feat, font=("Helvetica", 9),
                      bg=ESPRESSO, fg="#A07860", anchor="w").pack(
@@ -103,7 +103,7 @@ class LoginWindow:
         wrap.place(relx=0.5, rely=0.5, anchor="center", width=320)
 
         # Heading
-        tk.Label(wrap, text="Welcome back  👋",
+        tk.Label(wrap, text="Welcome Back",
                  font=("Helvetica", 22, "bold"),
                  bg=CARD_BG, fg=ESPRESSO).pack(anchor="w")
         tk.Label(wrap,
@@ -129,7 +129,7 @@ class LoginWindow:
         )
         self.password_entry.pack(side="left", fill="x", expand=True,
                                   ipady=9, padx=(10, 0))
-        eye = tk.Label(pw_inner, text="👁", font=("Helvetica", 13),
+        eye = tk.Label(pw_inner, text="Show", font=("Helvetica", 9),
                        bg=CARD_BG, fg=TEXT_MID, cursor="hand2", padx=10)
         eye.pack(side="right")
         eye.bind("<Button-1>", self._toggle_pw)

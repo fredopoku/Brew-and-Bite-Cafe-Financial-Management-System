@@ -42,7 +42,7 @@ class ExpenseScreen(ttk.Frame):
 
         title_col = tk.Frame(inner_hdr, bg=bg)
         title_col.pack(side="left")
-        tk.Label(title_col, text="💳  Expense Management",
+        tk.Label(title_col, text="Expense Management",
                  font=("Helvetica", 18, "bold"),
                  bg=bg, fg=ESPRESSO if _HAS_STYLES else "black").pack(anchor="w")
         tk.Label(title_col, text="Track and manage all café expenses",
@@ -110,7 +110,7 @@ class ExpenseScreen(ttk.Frame):
             state="readonly", width=18)
         self.category_combo.pack(side="left", padx=(4, 16))
 
-        ttk.Button(filter_bar, text="🔍  Search",
+        ttk.Button(filter_bar, text="Search",
                    command=self.load_expenses).pack(side="left", padx=(0, 4))
         ttk.Button(filter_bar, text="Export CSV",
                    style="Secondary.TButton" if _HAS_STYLES else "TButton",

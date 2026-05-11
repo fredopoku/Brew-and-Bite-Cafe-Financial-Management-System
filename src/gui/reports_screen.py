@@ -54,7 +54,7 @@ class ReportsScreen(ttk.Frame):
 
         title_col = tk.Frame(inner_hdr, bg=bg)
         title_col.pack(side="left")
-        tk.Label(title_col, text="📊  Reports & Analytics",
+        tk.Label(title_col, text="Reports & Analytics",
                  font=("Helvetica", 18, "bold"),
                  bg=bg, fg=ESPRESSO if _HAS_STYLES else "black").pack(anchor="w")
         tk.Label(title_col, text="Generate and export financial reports",

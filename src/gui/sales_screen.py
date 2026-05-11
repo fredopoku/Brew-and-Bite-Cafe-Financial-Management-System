@@ -43,7 +43,7 @@ class SalesScreen(ttk.Frame):
 
         title_col = tk.Frame(inner_hdr, bg=bg)
         title_col.pack(side="left")
-        tk.Label(title_col, text="🛍  Sales Management",
+        tk.Label(title_col, text="Sales Management",
                  font=("Helvetica", 18, "bold"),
                  bg=bg, fg=ESPRESSO if _HAS_STYLES else "black").pack(anchor="w")
         tk.Label(title_col, text="Manage transactions and view sales history",
@@ -538,7 +538,7 @@ class SalesScreen(ttk.Frame):
                 logger.error(f"Complete sale error: {ex}")
                 messagebox.showerror("Error", str(ex) or "Failed to complete sale", parent=dlg)
 
-        ttk.Button(footer, text="Complete Sale ✓",
+        ttk.Button(footer, text="Complete Sale",
                    style="Success.TButton" if _HAS_STYLES else "TButton",
                    command=complete).pack(side="right")
 

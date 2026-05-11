@@ -121,7 +121,7 @@ class MainWindow:
         icon_box = tk.Frame(top_row, bg=ESPRESSO, width=44, height=44)
         icon_box.pack(side="left")
         icon_box.pack_propagate(False)
-        tk.Label(icon_box, text="☕", font=("Helvetica", 22),
+        tk.Label(icon_box, text="B&B", font=("Helvetica", 12, "bold"),
                  bg=ESPRESSO, fg=CARD_BG).place(relx=0.5, rely=0.5, anchor="center")
         name_col = tk.Frame(top_row, bg=DARK_BROWN)
         name_col.pack(side="left", padx=(10, 0))
@@ -142,16 +142,16 @@ class MainWindow:
         self._nav_buttons = {}
         self._nav_rows    = {}
         nav_items = [
-            ("dashboard", "🏠", "Dashboard",      self.load_dashboard),
-            ("sales",     "🛍", "Sales",           self.load_sales),
-            ("inventory", "📦", "Inventory",       self.load_inventory),
-            ("expenses",  "💳", "Expenses",        self.load_expenses),
-            ("reports",   "📊", "Reports",         self.load_reports),
+            ("dashboard", "Dashboard",      self.load_dashboard),
+            ("sales",     "Sales",           self.load_sales),
+            ("inventory", "Inventory",       self.load_inventory),
+            ("expenses",  "Expenses",        self.load_expenses),
+            ("reports",   "Reports",         self.load_reports),
         ]
         if self.user_data['role'] == UserRole.ADMIN.value:
-            nav_items.append(("users", "👥", "User Management", self.load_user_management))
+            nav_items.append(("users", "User Management", self.load_user_management))
 
-        for key, icon, label, cmd in nav_items:
+        for key, label, cmd in nav_items:
             row = tk.Frame(self.sidebar, bg=ESPRESSO, cursor="hand2")
             row.pack(fill="x", pady=1)
 
@@ -161,7 +161,7 @@ class MainWindow:
             content = tk.Frame(row, bg=ESPRESSO, pady=10)
             content.pack(side="left", fill="x", expand=True, padx=(8, 12))
 
-            tk.Label(content, text=f"{icon}  {label}",
+            tk.Label(content, text=label,
                      font=FONT_BODY, anchor="w",
                      bg=ESPRESSO, fg=SIDEBAR_TEXT).pack(fill="x")
 
@@ -196,7 +196,7 @@ class MainWindow:
                  font=("Helvetica", 8),
                  bg=ESPRESSO, fg=role_colour).pack(anchor="w")
 
-        logout_btn = tk.Label(bottom, text="⏻", font=("Helvetica", 16),
+        logout_btn = tk.Label(bottom, text="Logout", font=("Helvetica", 8),
                               bg=ESPRESSO, fg=SIDEBAR_MUTED, cursor="hand2")
         logout_btn.pack(side="right")
         logout_btn.bind("<Button-1>", lambda _: self.logout())
@@ -237,7 +237,7 @@ class MainWindow:
         bar.grid(row=1, column=0, columnspan=2, sticky="ew")
         bar.grid_propagate(False)
 
-        tk.Label(bar, text="  ☕  Brew & Bite Café  ·  Management System  v1.0",
+        tk.Label(bar, text="  Brew & Bite  ·  Management System  v1.0",
                  font=("Helvetica", 9), bg=ESPRESSO, fg=SIDEBAR_MUTED).pack(side="left")
 
         self.time_label = tk.Label(bar, font=("Helvetica", 9),
@@ -318,24 +318,22 @@ class MainWindow:
             ("Today's Revenue",
              f"${sales_summary['summary']['total_sales']:,.2f}",
              f"{sales_summary['summary']['transaction_count']} transactions",
-             MEDIUM_BROWN, "💰"),
+             MEDIUM_BROWN),
             ("Today's Expenses",
              f"${expense_summary['summary']['total_amount']:,.2f}",
              f"{expense_summary['summary']['total_transactions']} recorded",
-             WARNING, "📋"),
+             WARNING),
             ("Net Income",
              f"${net:,.2f}",
              "Revenue − Expenses",
-             SUCCESS if net >= 0 else DANGER,
-             "📈" if net >= 0 else "📉"),
+             SUCCESS if net >= 0 else DANGER),
             ("Inventory Alerts",
              str(low_stock),
              f"of {inventory_status['total_items']} items at reorder level",
-             DANGER if low_stock > 0 else SUCCESS,
-             "⚠️" if low_stock > 0 else "✅"),
+             DANGER if low_stock > 0 else SUCCESS),
         ]
-        for col, (title, value, sub, colour, icon) in enumerate(card_data):
-            self._make_stat_card(cards_row, title, value, sub, colour, icon, col)
+        for col, (title, value, sub, colour) in enumerate(card_data):
+            self._make_stat_card(cards_row, title, value, sub, colour, col)
 
         # ---- Lower section: chart (left) + activity feed (right) ----
         lower = tk.Frame(outer, bg=CREAM)
@@ -351,7 +349,7 @@ class MainWindow:
 
         ch_hdr = tk.Frame(chart_card, bg=CARD_BG)
         ch_hdr.pack(fill="x", padx=16, pady=(14, 4))
-        tk.Label(ch_hdr, text="📈  Sales — Last 7 Days",
+        tk.Label(ch_hdr, text="Sales — Last 7 Days",
                  font=("Helvetica", 11, "bold"), bg=CARD_BG, fg=ESPRESSO).pack(side="left")
         tk.Label(ch_hdr, text=f"{week_start}  →  {today_str}",
                  font=("Helvetica", 8), bg=CARD_BG, fg=TEXT_MID).pack(side="right")
@@ -382,7 +380,7 @@ class MainWindow:
 
         act_hdr = tk.Frame(act_card, bg=CARD_BG)
         act_hdr.pack(fill="x", padx=16, pady=(14, 4))
-        tk.Label(act_hdr, text="🕐  Recent Activity",
+        tk.Label(act_hdr, text="Recent Activity",
                  font=("Helvetica", 11, "bold"), bg=CARD_BG, fg=ESPRESSO).pack(side="left")
         tk.Frame(act_card, bg=BORDER, height=1).pack(fill="x", padx=16)
 
@@ -441,12 +439,12 @@ class MainWindow:
         """Show a styled error message in the main content area."""
         f = tk.Frame(self.main_content, bg=CREAM)
         f.pack(fill="both", expand=True)
-        tk.Label(f, text="⚠", font=("Helvetica", 40),
+        tk.Label(f, text="!", font=("Helvetica", 40, "bold"),
                  bg=CREAM, fg=DANGER).pack(pady=(60, 8))
         tk.Label(f, text=message, font=FONT_BODY,
                  bg=CREAM, fg=TEXT_MID, justify="center").pack()
 
-    def _make_stat_card(self, parent, title, value, subtitle, colour, icon, col):
+    def _make_stat_card(self, parent, title, value, subtitle, colour, col):
         card = tk.Frame(parent, bg=CARD_BG,
                         highlightbackground=BORDER, highlightthickness=1)
         card.grid(row=0, column=col, padx=5, pady=4, sticky="nsew")
@@ -454,19 +452,13 @@ class MainWindow:
         body = tk.Frame(card, bg=CARD_BG)
         body.pack(fill="both", expand=True)
 
-        # Left colour accent bar
         tk.Frame(body, bg=colour, width=5).pack(side="left", fill="y")
 
         content = tk.Frame(body, bg=CARD_BG, padx=14, pady=14)
         content.pack(side="left", fill="both", expand=True)
 
-        top_row = tk.Frame(content, bg=CARD_BG)
-        top_row.pack(fill="x")
-        tk.Label(top_row, text=title, font=("Helvetica", 9),
-                 bg=CARD_BG, fg=TEXT_MID).pack(side="left")
-        tk.Label(top_row, text=icon, font=("Helvetica", 18),
-                 bg=CARD_BG).pack(side="right")
-
+        tk.Label(content, text=title, font=("Helvetica", 9),
+                 bg=CARD_BG, fg=TEXT_MID).pack(anchor="w")
         tk.Label(content, text=value,
                  font=("Helvetica", 24, "bold"),
                  bg=CARD_BG, fg=colour).pack(anchor="w", pady=(6, 2))

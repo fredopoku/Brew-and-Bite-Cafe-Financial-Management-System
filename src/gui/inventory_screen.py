@@ -40,7 +40,7 @@ class InventoryScreen(ttk.Frame):
 
         title_col = tk.Frame(inner_hdr, bg=bg)
         title_col.pack(side="left")
-        tk.Label(title_col, text="📦  Inventory Management",
+        tk.Label(title_col, text="Inventory Management",
                  font=("Helvetica", 18, "bold"),
                  bg=bg, fg=ESPRESSO if _HAS_STYLES else "black").pack(anchor="w")
         tk.Label(title_col, text="Monitor stock levels and manage items",
@@ -736,7 +736,7 @@ class InventoryScreen(ttk.Frame):
             # Add low stock and out of stock items
             for item in inventory['items']:
                 if item['quantity'] <= item['reorder_level']:
-                    priority = "‼️" if item['quantity'] == 0 else "⚠️"
+                    priority = "Critical" if item['quantity'] == 0 else "Low"
                     status = "Out of Stock" if item['quantity'] == 0 else "Low Stock"
 
                     self.alerts_tree.insert("", "end", values=(
