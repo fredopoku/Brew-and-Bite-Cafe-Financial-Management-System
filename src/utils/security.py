@@ -51,3 +51,7 @@ def generate_temporary_password() -> str:
     """Generate a secure temporary password"""
     alphabet = string.ascii_letters + string.digits + string.punctuation
     return ''.join(secrets.choice(alphabet) for _ in range(12))
+
+def generate_secret_key() -> str:
+    """Generate a cryptographically secure secret key"""
+    return secrets.token_hex(32)

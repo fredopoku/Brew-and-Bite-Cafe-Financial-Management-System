@@ -186,3 +186,19 @@ class SalesService:
         except Exception as e:
             logger.error(f"Failed to get top selling items: {str(e)}")
             raise
+
+    def get_sales(self, start_date: str, end_date: str) -> List[Dict]:
+        """Get individual sale records for a date range"""
+        try:
+            for date_str in [start_date, end_date]:
+                date_valid, date_error = validate_date(date_str)
+                if not date_valid:
+                    raise ValueError(date_error)
+
+            start = datetime.strptime(start_date, '%Y-%m-%d').date()
+            end = datetime.strptime(end_date, '%Y-%m-%d').date()
+            sales = self.sale_dao.get_sales_by_date_range(start, end)
+            return [self._format_sale_response(s) for s in sales]
+        except Exception as e:
+            logger.error(f"Failed to get sales: {str(e)}")
+            raise

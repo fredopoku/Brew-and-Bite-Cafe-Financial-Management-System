@@ -559,177 +559,177 @@ class ChangePasswordDialog:
             logger.error(f"Error changing password: {str(e)}")
             messagebox.showerror("Error", "Failed to change password")
 
-    class BackupDialog:
-        def __init__(self, parent, settings_service):
-            self.dialog = tk.Toplevel(parent)
-            self.dialog.title("Database Backup")
-            self.dialog.geometry("500x400")
-            self.dialog.grab_set()
+class BackupDialog:
+    def __init__(self, parent, settings_service):
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Database Backup")
+        self.dialog.geometry("500x400")
+        self.dialog.grab_set()
 
-            self.settings_service = settings_service
+        self.settings_service = settings_service
 
-            self.create_widgets()
+        self.create_widgets()
 
-            # Center dialog
-            self.dialog.transient(parent)
-            self.dialog.update_idletasks()
-            x = parent.winfo_x() + (parent.winfo_width() - self.dialog.winfo_width()) // 2
-            y = parent.winfo_y() + (parent.winfo_height() - self.dialog.winfo_height()) // 2
-            self.dialog.geometry(f"+{x}+{y}")
+        # Center dialog
+        self.dialog.transient(parent)
+        self.dialog.update_idletasks()
+        x = parent.winfo_x() + (parent.winfo_width() - self.dialog.winfo_width()) // 2
+        y = parent.winfo_y() + (parent.winfo_height() - self.dialog.winfo_height()) // 2
+        self.dialog.geometry(f"+{x}+{y}")
 
-        def create_widgets(self):
-            """Create dialog widgets"""
-            content_frame = ttk.Frame(self.dialog, padding=20)
-            content_frame.pack(fill="both", expand=True)
+    def create_widgets(self):
+        """Create dialog widgets"""
+        content_frame = ttk.Frame(self.dialog, padding=20)
+        content_frame.pack(fill="both", expand=True)
 
-            # Heading
-            ttk.Label(
-                content_frame,
-                text="Database Backup",
-                font=("Helvetica", 14, "bold")
-            ).pack(pady=(0, 20))
+        # Heading
+        ttk.Label(
+            content_frame,
+            text="Database Backup",
+            font=("Helvetica", 14, "bold")
+        ).pack(pady=(0, 20))
 
-            # Backup location
-            location_frame = ttk.Frame(content_frame)
-            location_frame.pack(fill="x", pady=5)
+        # Backup location
+        location_frame = ttk.Frame(content_frame)
+        location_frame.pack(fill="x", pady=5)
 
-            ttk.Label(
-                location_frame,
-                text="Backup Location:"
-            ).pack(side="left")
+        ttk.Label(
+            location_frame,
+            text="Backup Location:"
+        ).pack(side="left")
 
-            self.location_var = tk.StringVar()
-            ttk.Entry(
-                location_frame,
-                textvariable=self.location_var,
-                width=40
-            ).pack(side="left", padx=5)
+        self.location_var = tk.StringVar()
+        ttk.Entry(
+            location_frame,
+            textvariable=self.location_var,
+            width=40
+        ).pack(side="left", padx=5)
 
-            ttk.Button(
-                location_frame,
-                text="Browse",
-                command=self.browse_location
-            ).pack(side="left")
+        ttk.Button(
+            location_frame,
+            text="Browse",
+            command=self.browse_location
+        ).pack(side="left")
 
-            # Backup options
-            options_frame = ttk.LabelFrame(content_frame, text="Backup Options")
-            options_frame.pack(fill="x", pady=20)
+        # Backup options
+        options_frame = ttk.LabelFrame(content_frame, text="Backup Options")
+        options_frame.pack(fill="x", pady=20)
 
-            # Compress backup
-            self.compress_var = tk.BooleanVar(value=True)
-            ttk.Checkbutton(
-                options_frame,
-                text="Compress backup file",
-                variable=self.compress_var
-            ).pack(anchor="w", padx=10, pady=5)
+        # Compress backup
+        self.compress_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            options_frame,
+            text="Compress backup file",
+            variable=self.compress_var
+        ).pack(anchor="w", padx=10, pady=5)
 
-            # Include attachments
-            self.attachments_var = tk.BooleanVar(value=True)
-            ttk.Checkbutton(
-                options_frame,
-                text="Include attachments and media files",
-                variable=self.attachments_var
-            ).pack(anchor="w", padx=10, pady=5)
+        # Include attachments
+        self.attachments_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            options_frame,
+            text="Include attachments and media files",
+            variable=self.attachments_var
+        ).pack(anchor="w", padx=10, pady=5)
 
-            # Schedule frame
-            schedule_frame = ttk.LabelFrame(content_frame, text="Backup Schedule")
-            schedule_frame.pack(fill="x", pady=20)
+        # Schedule frame
+        schedule_frame = ttk.LabelFrame(content_frame, text="Backup Schedule")
+        schedule_frame.pack(fill="x", pady=20)
 
-            # Enable scheduling
-            self.schedule_var = tk.BooleanVar(value=False)
-            ttk.Checkbutton(
-                schedule_frame,
-                text="Enable automatic backups",
-                variable=self.schedule_var,
-                command=self.toggle_schedule_options
-            ).pack(anchor="w", padx=10, pady=5)
+        # Enable scheduling
+        self.schedule_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            schedule_frame,
+            text="Enable automatic backups",
+            variable=self.schedule_var,
+            command=self.toggle_schedule_options
+        ).pack(anchor="w", padx=10, pady=5)
 
-            # Schedule options
-            self.schedule_options = ttk.Frame(schedule_frame)
-            self.schedule_options.pack(fill="x", padx=10, pady=5)
+        # Schedule options
+        self.schedule_options = ttk.Frame(schedule_frame)
+        self.schedule_options.pack(fill="x", padx=10, pady=5)
 
-            ttk.Label(
-                self.schedule_options,
-                text="Frequency:"
-            ).pack(side="left")
+        ttk.Label(
+            self.schedule_options,
+            text="Frequency:"
+        ).pack(side="left")
 
-            self.frequency_var = tk.StringVar(value="daily")
-            ttk.Combobox(
-                self.schedule_options,
-                textvariable=self.frequency_var,
-                values=["daily", "weekly", "monthly"],
-                state="readonly",
-                width=15
-            ).pack(side="left", padx=5)
+        self.frequency_var = tk.StringVar(value="daily")
+        ttk.Combobox(
+            self.schedule_options,
+            textvariable=self.frequency_var,
+            values=["daily", "weekly", "monthly"],
+            state="readonly",
+            width=15
+        ).pack(side="left", padx=5)
 
-            # Initially disable schedule options
-            self.toggle_schedule_options()
+        # Initially disable schedule options
+        self.toggle_schedule_options()
 
-            # Buttons
-            button_frame = ttk.Frame(content_frame)
-            button_frame.pack(pady=20)
+        # Buttons
+        button_frame = ttk.Frame(content_frame)
+        button_frame.pack(pady=20)
 
-            ttk.Button(
-                button_frame,
-                text="Start Backup",
-                command=self.start_backup
-            ).pack(side="left", padx=5)
+        ttk.Button(
+            button_frame,
+            text="Start Backup",
+            command=self.start_backup
+        ).pack(side="left", padx=5)
 
-            ttk.Button(
-                button_frame,
-                text="Cancel",
-                command=self.dialog.destroy
-            ).pack(side="left", padx=5)
+        ttk.Button(
+            button_frame,
+            text="Cancel",
+            command=self.dialog.destroy
+        ).pack(side="left", padx=5)
 
-        def browse_location(self):
-            """Browse for backup location"""
-            directory = tk.filedialog.askdirectory(
-                title="Select Backup Location"
-            )
-            if directory:
-                self.location_var.set(directory)
+    def browse_location(self):
+        """Browse for backup location"""
+        directory = tk.filedialog.askdirectory(
+            title="Select Backup Location"
+        )
+        if directory:
+            self.location_var.set(directory)
 
-        def toggle_schedule_options(self):
-            """Enable/disable schedule options"""
-            for child in self.schedule_options.winfo_children():
-                child.configure(state="normal" if self.schedule_var.get() else "disabled")
+    def toggle_schedule_options(self):
+        """Enable/disable schedule options"""
+        for child in self.schedule_options.winfo_children():
+            child.configure(state="normal" if self.schedule_var.get() else "disabled")
 
-        def start_backup(self):
-            """Start the backup process"""
-            try:
-                location = self.location_var.get()
-                if not location:
-                    raise ValueError("Please select a backup location")
+    def start_backup(self):
+        """Start the backup process"""
+        try:
+            location = self.location_var.get()
+            if not location:
+                raise ValueError("Please select a backup location")
 
-                options = {
-                    'location': location,
-                    'compress': self.compress_var.get(),
-                    'include_attachments': self.attachments_var.get(),
-                    'schedule': {
-                        'enabled': self.schedule_var.get(),
-                        'frequency': self.frequency_var.get() if self.schedule_var.get() else None
-                    }
+            options = {
+                'location': location,
+                'compress': self.compress_var.get(),
+                'include_attachments': self.attachments_var.get(),
+                'schedule': {
+                    'enabled': self.schedule_var.get(),
+                    'frequency': self.frequency_var.get() if self.schedule_var.get() else None
                 }
+            }
 
-                # Create backup
-                backup_file = self.settings_service.create_backup(options)
+            # Create backup
+            backup_file = self.settings_service.create_backup(options)
 
-                messagebox.showinfo(
-                    "Success",
-                    f"Backup created successfully!\nLocation: {backup_file}"
-                )
-                self.dialog.destroy()
+            messagebox.showinfo(
+                "Success",
+                f"Backup created successfully!\nLocation: {backup_file}"
+            )
+            self.dialog.destroy()
 
-            except ValueError as e:
-                messagebox.showerror("Error", str(e))
-            except Exception as e:
-                logger.error(f"Error creating backup: {str(e)}")
-                messagebox.showerror("Error", "Failed to create backup")
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
+        except Exception as e:
+            logger.error(f"Error creating backup: {str(e)}")
+            messagebox.showerror("Error", "Failed to create backup")
 
-    # Update dialog boxes registry
-    dialogs = {
-        'about': AboutDialog,
-        'user_manual': UserManualDialog,
-        'change_password': ChangePasswordDialog,
-        'backup': BackupDialog
-    }
+# Update dialog boxes registry
+dialogs = {
+    'about': AboutDialog,
+    'user_manual': UserManualDialog,
+    'change_password': ChangePasswordDialog,
+    'backup': BackupDialog
+}

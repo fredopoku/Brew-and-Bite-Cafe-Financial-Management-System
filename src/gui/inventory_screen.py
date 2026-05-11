@@ -5,6 +5,15 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Dict, Optional
 
+try:
+    from src.gui.styles import (CREAM, CARD_BG, ESPRESSO, MEDIUM_BROWN, DARK_BROWN,
+                                 LIGHT_BROWN, BORDER, TEXT_DARK, TEXT_LIGHT, TEXT_MID,
+                                 SUCCESS, WARNING, DANGER, ROW_DANGER_BG, ROW_WARNING_BG,
+                                 FONT_H2, FONT_H3, FONT_BODY, FONT_SMALL)
+    _HAS_STYLES = True
+except ImportError:
+    _HAS_STYLES = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -19,32 +28,53 @@ class InventoryScreen(ttk.Frame):
         self.load_data()
 
     def create_widgets(self):
-        """Create and arrange widgets"""
-        # Main heading
-        heading_frame = ttk.Frame(self)
-        heading_frame.pack(fill="x", padx=10, pady=5)
+        bg = CREAM if _HAS_STYLES else "#f0f0f0"
 
-        ttk.Label(
-            heading_frame,
-            text="Inventory Management",
-            font=("Helvetica", 16, "bold")
-        ).pack(side="left")
+        # Page header
+        hdr = tk.Frame(self, bg=bg)
+        hdr.pack(fill="x")
+        tk.Frame(hdr, bg=MEDIUM_BROWN if _HAS_STYLES else "#8B5E3C", height=3).pack(fill="x")
 
-        ttk.Button(
-            heading_frame,
-            text="Add New Item",
-            command=self.show_add_item_dialog
-        ).pack(side="right", padx=5)
+        inner_hdr = tk.Frame(hdr, bg=bg, pady=14, padx=24)
+        inner_hdr.pack(fill="x")
 
-        ttk.Button(
-            heading_frame,
-            text="Stock Adjustment",
-            command=self.show_adjustment_dialog
-        ).pack(side="right", padx=5)
+        title_col = tk.Frame(inner_hdr, bg=bg)
+        title_col.pack(side="left")
+        tk.Label(title_col, text="📦  Inventory Management",
+                 font=("Helvetica", 18, "bold"),
+                 bg=bg, fg=ESPRESSO if _HAS_STYLES else "black").pack(anchor="w")
+        tk.Label(title_col, text="Monitor stock levels and manage items",
+                 font=("Helvetica", 9),
+                 bg=bg, fg=TEXT_MID if _HAS_STYLES else "#555").pack(anchor="w", pady=(2, 0))
 
-        # Create notebook for different views
+        btn_row = tk.Frame(inner_hdr, bg=bg)
+        btn_row.pack(side="right")
+
+        adj_btn = tk.Button(btn_row, text="  Stock Adjustment  ",
+                            font=("Helvetica", 10),
+                            bg=CARD_BG if _HAS_STYLES else "white",
+                            fg=MEDIUM_BROWN if _HAS_STYLES else "#8B5E3C",
+                            activebackground=BORDER if _HAS_STYLES else "#ccc",
+                            relief="flat", bd=0, cursor="hand2",
+                            highlightbackground=BORDER if _HAS_STYLES else "#ccc",
+                            highlightthickness=1,
+                            command=self.show_adjustment_dialog)
+        adj_btn.pack(side="left", ipady=8, padx=(0, 8))
+
+        add_btn = tk.Button(btn_row, text="  + Add New Item  ",
+                            font=("Helvetica", 10, "bold"),
+                            bg=MEDIUM_BROWN if _HAS_STYLES else "#8B5E3C",
+                            fg="white",
+                            activebackground=DARK_BROWN if _HAS_STYLES else "#4A2C17",
+                            activeforeground="white",
+                            relief="flat", bd=0, cursor="hand2",
+                            command=self.show_add_item_dialog)
+        add_btn.pack(side="left", ipady=8)
+
+        tk.Frame(hdr, bg=BORDER if _HAS_STYLES else "#ccc", height=1).pack(fill="x")
+
         self.notebook = ttk.Notebook(self)
-        self.notebook.pack(fill="both", expand=True, padx=10, pady=5)
+        self.notebook.pack(fill="both", expand=True, padx=12, pady=8)
 
         # Create tabs
         self.create_inventory_tab()
@@ -134,6 +164,7 @@ class InventoryScreen(ttk.Frame):
         # Bind context menu
         self.inventory_tree.bind("<Button-3>", self.show_context_menu)
         self.inventory_tree.bind("<Double-1>", self.show_item_details)
+        self.inventory_tree.bind("<<TreeviewSelect>>", self._on_item_select)
 
         # Create context menu
         self.context_menu = tk.Menu(self, tearoff=0)
@@ -284,24 +315,34 @@ class InventoryScreen(ttk.Frame):
             for item in self.inventory_tree.get_children():
                 self.inventory_tree.delete(item)
 
+            # Configure row colour tags — foreground colours chosen for ≥ 4.5:1 on their bg
+            if _HAS_STYLES:
+                self.inventory_tree.tag_configure("out", background=ROW_DANGER_BG,  foreground=DANGER)
+                self.inventory_tree.tag_configure("low", background=ROW_WARNING_BG, foreground=WARNING)
+                self.inventory_tree.tag_configure("ok",  background=CARD_BG,        foreground=TEXT_DARK)
+
             # Add items to treeview
             for item in inventory['items']:
                 total_value = item['quantity'] * item['unit_cost']
-                status = (
-                    "Out of Stock" if item['quantity'] == 0
-                    else "Low Stock" if item['quantity'] <= item['reorder_level']
-                    else "In Stock"
-                )
+                if item['quantity'] == 0:
+                    status, tag = "Out of Stock", "out"
+                elif item['quantity'] <= item['reorder_level']:
+                    status, tag = "Low Stock", "low"
+                else:
+                    status, tag = "In Stock", "ok"
 
-                self.inventory_tree.insert("", "end", values=(
-                    item['id'],
-                    item['name'],
-                    item['quantity'],
-                    f"${item['unit_cost']:.2f}",
-                    f"${total_value:.2f}",
-                    item['reorder_level'],
-                    status
-                ))
+                self.inventory_tree.insert("", "end",
+                    tags=(tag,) if _HAS_STYLES else (),
+                    values=(
+                        item['id'],
+                        item['name'],
+                        item['quantity'],
+                        f"${item['unit_cost']:.2f}",
+                        f"${total_value:.2f}",
+                        item['reorder_level'],
+                        status
+                    )
+                )
 
             # Load transactions
             self.load_transactions()
@@ -443,346 +484,350 @@ class InventoryScreen(ttk.Frame):
                 logger.error(f"Error adding inventory item: {str(e)}")
                 messagebox.showerror("Error", "Failed to add inventory item")
 
-                # Add save button
-            ttk.Button(
-                dialog,
-                text="Save",
-                command=save_item
-            ).pack(pady=20)
+        # Add save button
+        ttk.Button(
+            dialog,
+            text="Save",
+            command=save_item
+        ).pack(pady=20)
 
-            def show_edit_dialog(self):
-                """Show dialog to edit selected inventory item"""
-                if not self.selected_item:
-                    return
+    def show_edit_dialog(self):
+        """Show dialog to edit selected inventory item"""
+        if not self.selected_item:
+            return
 
-                dialog = tk.Toplevel(self)
-                dialog.title("Edit Item")
-                dialog.geometry("400x400")
-                dialog.grab_set()
+        dialog = tk.Toplevel(self)
+        dialog.title("Edit Item")
+        dialog.geometry("400x400")
+        dialog.grab_set()
 
-                # Form fields
-                ttk.Label(dialog, text="Item Name:").pack(pady=5)
-                name_var = tk.StringVar(value=self.selected_item[1])
-                ttk.Entry(dialog, textvariable=name_var, width=40).pack(pady=5)
+        # Form fields
+        ttk.Label(dialog, text="Item Name:").pack(pady=5)
+        name_var = tk.StringVar(value=self.selected_item[1])
+        ttk.Entry(dialog, textvariable=name_var, width=40).pack(pady=5)
 
-                ttk.Label(dialog, text="Current Quantity:").pack(pady=5)
-                ttk.Label(
-                    dialog,
-                    text=str(self.selected_item[2]),
-                    font=("Helvetica", 12, "bold")
-                ).pack(pady=5)
+        ttk.Label(dialog, text="Current Quantity:").pack(pady=5)
+        ttk.Label(
+            dialog,
+            text=str(self.selected_item[2]),
+            font=("Helvetica", 12, "bold")
+        ).pack(pady=5)
 
-                ttk.Label(dialog, text="Unit Cost ($):").pack(pady=5)
-                cost_var = tk.StringVar(
-                    value=str(float(self.selected_item[3].replace('$', '')))
+        ttk.Label(dialog, text="Unit Cost ($):").pack(pady=5)
+        cost_var = tk.StringVar(
+            value=str(float(self.selected_item[3].replace('$', '')))
+        )
+        ttk.Entry(dialog, textvariable=cost_var, width=40).pack(pady=5)
+
+        ttk.Label(dialog, text="Reorder Level:").pack(pady=5)
+        reorder_var = tk.StringVar(value=str(self.selected_item[5]))
+        ttk.Entry(dialog, textvariable=reorder_var, width=40).pack(pady=5)
+
+        def save_changes():
+            try:
+                # Validate inputs
+                name = name_var.get().strip()
+                if not name:
+                    raise ValueError("Item name is required")
+
+                try:
+                    unit_cost = float(cost_var.get())
+                    if unit_cost < 0:
+                        raise ValueError()
+                except ValueError:
+                    raise ValueError("Unit cost must be a positive number")
+
+                try:
+                    reorder_level = int(reorder_var.get())
+                    if reorder_level < 0:
+                        raise ValueError()
+                except ValueError:
+                    raise ValueError("Reorder level must be a positive number")
+
+                # Update item
+                update_data = {
+                    'name': name,
+                    'unit_cost': unit_cost,
+                    'reorder_level': reorder_level
+                }
+
+                self.services['inventory'].update_item(
+                    item_id=self.selected_item[0],
+                    update_data=update_data,
+                    audit_user_id=1  # TODO: Get actual user ID
                 )
-                ttk.Entry(dialog, textvariable=cost_var, width=40).pack(pady=5)
 
-                ttk.Label(dialog, text="Reorder Level:").pack(pady=5)
-                reorder_var = tk.StringVar(value=str(self.selected_item[5]))
-                ttk.Entry(dialog, textvariable=reorder_var, width=40).pack(pady=5)
+                messagebox.showinfo("Success", "Item updated successfully!")
+                dialog.destroy()
 
-                def save_changes():
-                    try:
-                        # Validate inputs
-                        name = name_var.get().strip()
-                        if not name:
-                            raise ValueError("Item name is required")
+                # Refresh inventory list
+                self.load_data()
 
-                        try:
-                            unit_cost = float(cost_var.get())
-                            if unit_cost < 0:
-                                raise ValueError()
-                        except ValueError:
-                            raise ValueError("Unit cost must be a positive number")
+            except ValueError as e:
+                messagebox.showerror("Error", str(e))
+            except Exception as e:
+                logger.error(f"Error updating inventory item: {str(e)}")
+                messagebox.showerror("Error", "Failed to update inventory item")
 
-                        try:
-                            reorder_level = int(reorder_var.get())
-                            if reorder_level < 0:
-                                raise ValueError()
-                        except ValueError:
-                            raise ValueError("Reorder level must be a positive number")
+        # Add save button
+        ttk.Button(
+            dialog,
+            text="Save Changes",
+            command=save_changes
+        ).pack(pady=20)
 
-                        # Update item
-                        update_data = {
-                            'name': name,
-                            'unit_cost': unit_cost,
-                            'reorder_level': reorder_level
-                        }
+    def show_adjustment_dialog(self):
+        """Show dialog to adjust inventory stock"""
+        if not self.selected_item:
+            messagebox.showwarning("Warning", "Please select an item first")
+            return
 
-                        self.services['inventory'].update_item(
-                            item_id=self.selected_item[0],
-                            update_data=update_data,
-                            audit_user_id=1  # TODO: Get actual user ID
-                        )
+        dialog = tk.Toplevel(self)
+        dialog.title("Stock Adjustment")
+        dialog.geometry("400x300")
+        dialog.grab_set()
 
-                        messagebox.showinfo("Success", "Item updated successfully!")
-                        dialog.destroy()
+        # Item details
+        ttk.Label(
+            dialog,
+            text=f"Item: {self.selected_item[1]}",
+            font=("Helvetica", 12, "bold")
+        ).pack(pady=5)
 
-                        # Refresh inventory list
-                        self.load_data()
+        ttk.Label(
+            dialog,
+            text=f"Current Stock: {self.selected_item[2]}",
+            font=("Helvetica", 10)
+        ).pack(pady=5)
 
-                    except ValueError as e:
-                        messagebox.showerror("Error", str(e))
-                    except Exception as e:
-                        logger.error(f"Error updating inventory item: {str(e)}")
-                        messagebox.showerror("Error", "Failed to update inventory item")
+        # Adjustment fields
+        frame = ttk.Frame(dialog)
+        frame.pack(pady=20)
 
-                # Add save button
-                ttk.Button(
-                    dialog,
-                    text="Save Changes",
-                    command=save_changes
-                ).pack(pady=20)
+        ttk.Label(frame, text="Adjustment Type:").grid(row=0, column=0, padx=5)
+        type_var = tk.StringVar(value="add")
+        ttk.Radiobutton(
+            frame,
+            text="Add Stock",
+            variable=type_var,
+            value="add"
+        ).grid(row=0, column=1, padx=5)
+        ttk.Radiobutton(
+            frame,
+            text="Remove Stock",
+            variable=type_var,
+            value="remove"
+        ).grid(row=0, column=2, padx=5)
 
-            def show_adjustment_dialog(self):
-                """Show dialog to adjust inventory stock"""
-                if not self.selected_item:
-                    messagebox.showwarning("Warning", "Please select an item first")
-                    return
+        ttk.Label(frame, text="Quantity:").grid(row=1, column=0, padx=5, pady=10)
+        quantity_var = tk.StringVar(value="0")
+        ttk.Entry(
+            frame,
+            textvariable=quantity_var,
+            width=10
+        ).grid(row=1, column=1, columnspan=2, pady=10)
 
-                dialog = tk.Toplevel(self)
-                dialog.title("Stock Adjustment")
-                dialog.geometry("400x300")
-                dialog.grab_set()
+        ttk.Label(frame, text="Reason:").grid(row=2, column=0, padx=5)
+        reason_var = tk.StringVar()
+        ttk.Entry(
+            frame,
+            textvariable=reason_var,
+            width=40
+        ).grid(row=2, column=1, columnspan=2, padx=5)
 
-                # Item details
-                ttk.Label(
-                    dialog,
-                    text=f"Item: {self.selected_item[1]}",
-                    font=("Helvetica", 12, "bold")
-                ).pack(pady=5)
-
-                ttk.Label(
-                    dialog,
-                    text=f"Current Stock: {self.selected_item[2]}",
-                    font=("Helvetica", 10)
-                ).pack(pady=5)
-
-                # Adjustment fields
-                frame = ttk.Frame(dialog)
-                frame.pack(pady=20)
-
-                ttk.Label(frame, text="Adjustment Type:").grid(row=0, column=0, padx=5)
-                type_var = tk.StringVar(value="add")
-                ttk.Radiobutton(
-                    frame,
-                    text="Add Stock",
-                    variable=type_var,
-                    value="add"
-                ).grid(row=0, column=1, padx=5)
-                ttk.Radiobutton(
-                    frame,
-                    text="Remove Stock",
-                    variable=type_var,
-                    value="remove"
-                ).grid(row=0, column=2, padx=5)
-
-                ttk.Label(frame, text="Quantity:").grid(row=1, column=0, padx=5, pady=10)
-                quantity_var = tk.StringVar(value="0")
-                ttk.Entry(
-                    frame,
-                    textvariable=quantity_var,
-                    width=10
-                ).grid(row=1, column=1, columnspan=2, pady=10)
-
-                ttk.Label(frame, text="Reason:").grid(row=2, column=0, padx=5)
-                reason_var = tk.StringVar()
-                ttk.Entry(
-                    frame,
-                    textvariable=reason_var,
-                    width=40
-                ).grid(row=2, column=1, columnspan=2, padx=5)
-
-                def save_adjustment():
-                    try:
-                        # Validate inputs
-                        try:
-                            quantity = int(quantity_var.get())
-                            if quantity <= 0:
-                                raise ValueError()
-                        except ValueError:
-                            raise ValueError("Quantity must be a positive number")
-
-                        reason = reason_var.get().strip()
-                        if not reason:
-                            raise ValueError("Please provide a reason for the adjustment")
-
-                        # Calculate actual quantity change
-                        quantity_change = quantity if type_var.get() == "add" else -quantity
-
-                        # Update stock
-                        self.services['inventory'].update_stock(
-                            item_id=self.selected_item[0],
-                            quantity_change=quantity_change,
-                            transaction_type='adjustment',
-                            user_id=1,  # TODO: Get actual user ID
-                            notes=reason
-                        )
-
-                        messagebox.showinfo("Success", "Stock adjusted successfully!")
-                        dialog.destroy()
-
-                        # Refresh inventory list
-                        self.load_data()
-
-                    except ValueError as e:
-                        messagebox.showerror("Error", str(e))
-                    except Exception as e:
-                        logger.error(f"Error adjusting stock: {str(e)}")
-                        messagebox.showerror("Error", "Failed to adjust stock")
-
-                # Add save button
-                ttk.Button(
-                    dialog,
-                    text="Save Adjustment",
-                    command=save_adjustment
-                ).pack(pady=20)
-
-            def show_item_history(self):
-                """Show transaction history for selected item"""
-                if not self.selected_item:
-                    return
-
-                # Switch to transactions tab and filter for selected item
-                self.notebook.select(1)  # Switch to transactions tab
-                self.load_transactions(item_id=self.selected_item[0])
-
-            def load_transactions(self, item_id: Optional[int] = None):
-                """Load transaction history"""
+        def save_adjustment():
+            try:
+                # Validate inputs
                 try:
-                    # Clear existing items
-                    for item in self.transactions_tree.get_children():
-                        self.transactions_tree.delete(item)
+                    quantity = int(quantity_var.get())
+                    if quantity <= 0:
+                        raise ValueError()
+                except ValueError:
+                    raise ValueError("Quantity must be a positive number")
 
-                    # Get transaction history
-                    transactions = self.services['inventory'].get_transaction_history(
-                        item_id=item_id,
-                        start_date=self.start_date_var.get(),
-                        end_date=self.end_date_var.get(),
-                        transaction_type=self.trans_type_var.get() if self.trans_type_var.get() != "All" else None
-                    )
+                reason = reason_var.get().strip()
+                if not reason:
+                    raise ValueError("Please provide a reason for the adjustment")
 
-                    # Add transactions to treeview
-                    for trans in transactions:
-                        self.transactions_tree.insert("", "end", values=(
-                            trans['date'],
-                            trans['item_name'],
-                            trans['type'],
-                            trans['quantity'],
-                            trans['user'],
-                            trans['notes']
-                        ))
+                # Calculate actual quantity change
+                quantity_change = quantity if type_var.get() == "add" else -quantity
 
-                except Exception as e:
-                    logger.error(f"Error loading transactions: {str(e)}")
-                    messagebox.showerror("Error", "Failed to load transaction history")
+                # Update stock
+                self.services['inventory'].update_stock(
+                    item_id=self.selected_item[0],
+                    quantity_change=quantity_change,
+                    transaction_type='adjustment',
+                    user_id=1,  # TODO: Get actual user ID
+                    notes=reason
+                )
 
-            def load_alerts(self):
-                """Load inventory alerts"""
-                try:
-                    # Clear existing alerts
-                    for item in self.alerts_tree.get_children():
-                        self.alerts_tree.delete(item)
+                messagebox.showinfo("Success", "Stock adjusted successfully!")
+                dialog.destroy()
 
-                    # Get inventory status
-                    inventory = self.services['inventory'].get_inventory_status()
+                # Refresh inventory list
+                self.load_data()
 
-                    # Add low stock and out of stock items
-                    for item in inventory['items']:
-                        if item['quantity'] <= item['reorder_level']:
-                            priority = "‼️" if item['quantity'] == 0 else "⚠️"
-                            status = "Out of Stock" if item['quantity'] == 0 else "Low Stock"
+            except ValueError as e:
+                messagebox.showerror("Error", str(e))
+            except Exception as e:
+                logger.error(f"Error adjusting stock: {str(e)}")
+                messagebox.showerror("Error", "Failed to adjust stock")
 
-                            self.alerts_tree.insert("", "end", values=(
-                                priority,
-                                item['name'],
-                                item['quantity'],
-                                item['reorder_level'],
-                                status
-                            ))
+        # Add save button
+        ttk.Button(
+            dialog,
+            text="Save Adjustment",
+            command=save_adjustment
+        ).pack(pady=20)
 
-                except Exception as e:
-                    logger.error(f"Error loading alerts: {str(e)}")
-                    messagebox.showerror("Error", "Failed to load inventory alerts")
+    def _on_item_select(self, event):
+        """Update selected_item when user single-clicks a row"""
+        selection = self.inventory_tree.selection()
+        if selection:
+            self.selected_item = self.inventory_tree.item(selection[0])['values']
 
-            def generate_reorder_report(self):
-                """Generate and export reorder report"""
-                try:
-                    report_data = self.services['inventory'].generate_reorder_report()
+    def show_item_history(self):
+        """Show transaction history for selected item"""
+        if not self.selected_item:
+            return
 
-                    # Save file
-                    import tkinter.filedialog as filedialog
-                    filename = filedialog.asksaveasfilename(
-                        defaultextension=".pdf",
-                        filetypes=[("PDF files", "*.pdf")],
-                        initialfile=f"reorder_report_{datetime.now().strftime('%Y%m%d')}.pdf"
-                    )
+        # Switch to transactions tab and filter for selected item
+        self.notebook.select(1)  # Switch to transactions tab
+        self.load_transactions(item_id=self.selected_item[0], item_name=self.selected_item[1])
 
-                    if filename:
-                        with open(filename, 'wb') as f:
-                            f.write(report_data)
-                        messagebox.showinfo("Success", "Reorder report generated successfully!")
+    def load_transactions(self, item_id: Optional[int] = None, item_name: str = ""):
+        """Load transaction history"""
+        try:
+            # Clear existing items
+            for item in self.transactions_tree.get_children():
+                self.transactions_tree.delete(item)
 
-                except Exception as e:
-                    logger.error(f"Error generating reorder report: {str(e)}")
-                    messagebox.showerror("Error", "Failed to generate reorder report")
+            if item_id is None:
+                return
 
-            def export_inventory(self):
-                """Export current inventory list"""
-                try:
-                    # Get current filters
-                    search_term = self.search_var.get()
-                    status_filter = self.status_var.get()
+            # Get transaction history
+            transactions = self.services['inventory'].get_transaction_history(item_id=item_id)
 
-                    # Generate report
-                    report_data = self.services['inventory'].export_inventory(
-                        search_term=search_term if search_term else None,
-                        status_filter=status_filter if status_filter != "All" else None,
-                        format='csv'
-                    )
+            # Add transactions to treeview
+            for trans in transactions:
+                self.transactions_tree.insert("", "end", values=(
+                    trans['date'],
+                    item_name or f"Item #{item_id}",
+                    trans['type'],
+                    trans['quantity'],
+                    trans['user']['username'],
+                    trans['notes']
+                ))
 
-                    # Save file
-                    import tkinter.filedialog as filedialog
-                    filename = filedialog.asksaveasfilename(
-                        defaultextension=".csv",
-                        filetypes=[("CSV files", "*.csv")],
-                        initialfile=f"inventory_{datetime.now().strftime('%Y%m%d')}.csv"
-                    )
+        except Exception as e:
+            logger.error(f"Error loading transactions: {str(e)}")
+            messagebox.showerror("Error", "Failed to load transaction history")
 
-                    if filename:
-                        with open(filename, 'wb') as f:
-                            f.write(report_data)
-                        messagebox.showinfo("Success", "Inventory exported successfully!")
+    def load_alerts(self):
+        """Load inventory alerts"""
+        try:
+            # Clear existing alerts
+            for item in self.alerts_tree.get_children():
+                self.alerts_tree.delete(item)
 
-                except Exception as e:
-                    logger.error(f"Error exporting inventory: {str(e)}")
-                    messagebox.showerror("Error", "Failed to export inventory")
+            # Get inventory status
+            inventory = self.services['inventory'].get_inventory_status()
 
-            def export_transactions(self):
-                """Export transaction history"""
-                try:
-                    # Generate report
-                    report_data = self.services['inventory'].export_transactions(
-                        start_date=self.start_date_var.get(),
-                        end_date=self.end_date_var.get(),
-                        transaction_type=self.trans_type_var.get() if self.trans_type_var.get() != "All" else None,
-                        format='csv'
-                    )
+            # Add low stock and out of stock items
+            for item in inventory['items']:
+                if item['quantity'] <= item['reorder_level']:
+                    priority = "‼️" if item['quantity'] == 0 else "⚠️"
+                    status = "Out of Stock" if item['quantity'] == 0 else "Low Stock"
 
-                    # Save file
-                    import tkinter.filedialog as filedialog
-                    filename = filedialog.asksaveasfilename(
-                        defaultextension=".csv",
-                        filetypes=[("CSV files", "*.csv")],
-                        initialfile=f"transactions_{datetime.now().strftime('%Y%m%d')}.csv"
-                    )
+                    self.alerts_tree.insert("", "end", values=(
+                        priority,
+                        item['name'],
+                        item['quantity'],
+                        item['reorder_level'],
+                        status
+                    ))
 
-                    if filename:
-                        with open(filename, 'wb') as f:
-                            f.write(report_data)
-                        messagebox.showinfo("Success", "Transactions exported successfully!")
+        except Exception as e:
+            logger.error(f"Error loading alerts: {str(e)}")
+            messagebox.showerror("Error", "Failed to load inventory alerts")
 
-                except Exception as e:
-                    logger.error(f"Error exporting transactions: {str(e)}")
-                    messagebox.showerror("Error", "Failed to export transactions")
+    def generate_reorder_report(self):
+        """Generate and export reorder report"""
+        try:
+            report_data = self.services['inventory'].generate_reorder_report()
+
+            # Save file
+            import tkinter.filedialog as filedialog
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".pdf",
+                filetypes=[("PDF files", "*.pdf")],
+                initialfile=f"reorder_report_{datetime.now().strftime('%Y%m%d')}.pdf"
+            )
+
+            if filename:
+                with open(filename, 'wb') as f:
+                    f.write(report_data)
+                messagebox.showinfo("Success", "Reorder report generated successfully!")
+
+        except Exception as e:
+            logger.error(f"Error generating reorder report: {str(e)}")
+            messagebox.showerror("Error", "Failed to generate reorder report")
+
+    def export_inventory(self):
+        """Export current inventory list"""
+        try:
+            # Get current filters
+            search_term = self.search_var.get()
+            status_filter = self.status_var.get()
+
+            # Generate report
+            report_data = self.services['inventory'].export_inventory(
+                search_term=search_term if search_term else None,
+                status_filter=status_filter if status_filter != "All" else None,
+                format='csv'
+            )
+
+            # Save file
+            import tkinter.filedialog as filedialog
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv")],
+                initialfile=f"inventory_{datetime.now().strftime('%Y%m%d')}.csv"
+            )
+
+            if filename:
+                with open(filename, 'wb') as f:
+                    f.write(report_data)
+                messagebox.showinfo("Success", "Inventory exported successfully!")
+
+        except Exception as e:
+            logger.error(f"Error exporting inventory: {str(e)}")
+            messagebox.showerror("Error", "Failed to export inventory")
+
+    def export_transactions(self):
+        """Export transaction history"""
+        try:
+            # Generate report
+            report_data = self.services['inventory'].export_transactions(
+                start_date=self.start_date_var.get(),
+                end_date=self.end_date_var.get(),
+                transaction_type=self.trans_type_var.get() if self.trans_type_var.get() != "All" else None,
+                format='csv'
+            )
+
+            # Save file
+            import tkinter.filedialog as filedialog
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv")],
+                initialfile=f"transactions_{datetime.now().strftime('%Y%m%d')}.csv"
+            )
+
+            if filename:
+                with open(filename, 'wb') as f:
+                    f.write(report_data)
+                messagebox.showinfo("Success", "Transactions exported successfully!")
+
+        except Exception as e:
+            logger.error(f"Error exporting transactions: {str(e)}")
+            messagebox.showerror("Error", "Failed to export transactions")

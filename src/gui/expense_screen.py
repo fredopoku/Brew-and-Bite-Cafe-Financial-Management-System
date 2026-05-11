@@ -28,30 +28,43 @@ class ExpenseScreen(ttk.Frame):
         self.load_data()
 
     def create_widgets(self):
-        """Create and arrange widgets"""
-        bg = CREAM if _HAS_STYLES else None
+        bg = CREAM if _HAS_STYLES else "#f0f0f0"
 
-        # Header bar
-        heading_frame = tk.Frame(self, bg=bg or "#f0f0f0", pady=12)
-        heading_frame.pack(fill="x", padx=20)
+        # Page header
+        hdr = tk.Frame(self, bg=bg, pady=0)
+        hdr.pack(fill="x")
 
-        tk.Label(
-            heading_frame, text="Expense Management",
-            font=FONT_H2 if _HAS_STYLES else ("Helvetica", 16, "bold"),
-            bg=bg or "#f0f0f0",
-            fg=ESPRESSO if _HAS_STYLES else "black"
-        ).pack(side="left")
+        # Accent top bar
+        tk.Frame(hdr, bg=MEDIUM_BROWN if _HAS_STYLES else "#8B5E3C", height=3).pack(fill="x")
 
-        ttk.Button(
-            heading_frame,
-            text="+ Record Expense",
-            style="Primary.TButton" if _HAS_STYLES else "TButton",
-            command=self.show_add_expense_dialog
-        ).pack(side="right")
+        inner_hdr = tk.Frame(hdr, bg=bg, pady=14, padx=24)
+        inner_hdr.pack(fill="x")
+
+        title_col = tk.Frame(inner_hdr, bg=bg)
+        title_col.pack(side="left")
+        tk.Label(title_col, text="💳  Expense Management",
+                 font=("Helvetica", 18, "bold"),
+                 bg=bg, fg=ESPRESSO if _HAS_STYLES else "black").pack(anchor="w")
+        tk.Label(title_col, text="Track and manage all café expenses",
+                 font=("Helvetica", 9),
+                 bg=bg, fg=TEXT_MID if _HAS_STYLES else "#555").pack(anchor="w", pady=(2, 0))
+
+        add_btn = tk.Button(inner_hdr, text="  + Record Expense  ",
+                            font=("Helvetica", 10, "bold"),
+                            bg=MEDIUM_BROWN if _HAS_STYLES else "#8B5E3C",
+                            fg="white",
+                            activebackground=DARK_BROWN if _HAS_STYLES else "#4A2C17",
+                            activeforeground="white",
+                            relief="flat", bd=0, cursor="hand2",
+                            command=self.show_add_expense_dialog)
+        add_btn.pack(side="right", ipady=8)
+        tk.Frame(inner_hdr, bg=bg, width=1).pack(side="right", padx=4)
+
+        tk.Frame(hdr, bg=BORDER if _HAS_STYLES else "#ccc", height=1).pack(fill="x")
 
         # Notebook for tabs
         self.notebook = ttk.Notebook(self)
-        self.notebook.pack(fill="both", expand=True, padx=10, pady=5)
+        self.notebook.pack(fill="both", expand=True, padx=12, pady=8)
 
         self.create_expenses_tab()
         self.create_categories_tab()
@@ -60,59 +73,48 @@ class ExpenseScreen(ttk.Frame):
         self.pack(fill="both", expand=True)
 
     def create_expenses_tab(self):
-        """Create main expenses view"""
         tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="Expenses")
+        self.notebook.add(tab, text="  Expenses  ")
 
-        # Controls frame
-        controls_frame = ttk.Frame(tab)
-        controls_frame.pack(fill="x", padx=5, pady=5)
+        # Filter bar
+        bg = CREAM if _HAS_STYLES else "#f0f0f0"
+        filter_bar = tk.Frame(tab, bg=CARD_BG if _HAS_STYLES else "white",
+                              pady=10, padx=12,
+                              highlightbackground=BORDER if _HAS_STYLES else "#ccc",
+                              highlightthickness=1)
+        filter_bar.pack(fill="x", padx=8, pady=(8, 4))
 
-        # Date range
-        ttk.Label(controls_frame, text="Date Range:").pack(side="left")
-        self.start_date_var = tk.StringVar(
-            value=datetime.now().strftime("%Y-%m-%d")
-        )
-        ttk.Entry(
-            controls_frame,
-            textvariable=self.start_date_var,
-            width=10
-        ).pack(side="left", padx=5)
+        tk.Label(filter_bar, text="From",
+                 font=("Helvetica", 9, "bold"),
+                 bg=CARD_BG if _HAS_STYLES else "white",
+                 fg=TEXT_MID if _HAS_STYLES else "#555").pack(side="left")
+        self.start_date_var = tk.StringVar(value=datetime.now().strftime("%Y-%m-%d"))
+        ttk.Entry(filter_bar, textvariable=self.start_date_var, width=11).pack(
+            side="left", padx=(4, 0))
 
-        ttk.Label(controls_frame, text="to").pack(side="left")
-        self.end_date_var = tk.StringVar(
-            value=datetime.now().strftime("%Y-%m-%d")
-        )
-        ttk.Entry(
-            controls_frame,
-            textvariable=self.end_date_var,
-            width=10
-        ).pack(side="left", padx=5)
+        tk.Label(filter_bar, text="  to",
+                 font=("Helvetica", 9, "bold"),
+                 bg=CARD_BG if _HAS_STYLES else "white",
+                 fg=TEXT_MID if _HAS_STYLES else "#555").pack(side="left")
+        self.end_date_var = tk.StringVar(value=datetime.now().strftime("%Y-%m-%d"))
+        ttk.Entry(filter_bar, textvariable=self.end_date_var, width=11).pack(
+            side="left", padx=(4, 16))
 
-        # Category filter
-        ttk.Label(controls_frame, text="Category:").pack(side="left", padx=(20, 5))
+        tk.Label(filter_bar, text="Category",
+                 font=("Helvetica", 9, "bold"),
+                 bg=CARD_BG if _HAS_STYLES else "white",
+                 fg=TEXT_MID if _HAS_STYLES else "#555").pack(side="left")
         self.category_var = tk.StringVar(value="All")
         self.category_combo = ttk.Combobox(
-            controls_frame,
-            textvariable=self.category_var,
-            state="readonly",
-            width=20
-        )
-        self.category_combo.pack(side="left", padx=5)
+            filter_bar, textvariable=self.category_var,
+            state="readonly", width=18)
+        self.category_combo.pack(side="left", padx=(4, 16))
 
-        # Search button
-        ttk.Button(
-            controls_frame,
-            text="Search",
-            command=self.load_expenses
-        ).pack(side="left", padx=5)
-
-        # Export button
-        ttk.Button(
-            controls_frame,
-            text="Export",
-            command=self.export_expenses
-        ).pack(side="right", padx=5)
+        ttk.Button(filter_bar, text="🔍  Search",
+                   command=self.load_expenses).pack(side="left", padx=(0, 4))
+        ttk.Button(filter_bar, text="Export CSV",
+                   style="Secondary.TButton" if _HAS_STYLES else "TButton",
+                   command=self.export_expenses).pack(side="right")
 
         # Create expenses treeview (ID is column 0, hidden with width=0)
         columns = ("ID", "Date", "Category", "Amount", "Description", "Added By")
@@ -149,16 +151,18 @@ class ExpenseScreen(ttk.Frame):
         self.expenses_tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # Bind context menu
+        # Alternating row colours
+        self.expenses_tree.tag_configure('odd',  background="#F9F5F0")
+        self.expenses_tree.tag_configure('even', background=CARD_BG if _HAS_STYLES else "white")
+
         self.expenses_tree.bind("<Button-3>", self.show_context_menu)
         self.expenses_tree.bind("<Double-1>", self.show_expense_details)
 
-        # Create context menu
         self.context_menu = tk.Menu(self, tearoff=0)
-        self.context_menu.add_command(label="Edit Expense", command=self.show_edit_dialog)
+        self.context_menu.add_command(label="Edit Expense",   command=self.show_edit_dialog)
         self.context_menu.add_command(label="Delete Expense", command=self.delete_expense)
         self.context_menu.add_separator()
-        self.context_menu.add_command(label="View Details", command=self.show_expense_details)
+        self.context_menu.add_command(label="View Details",   command=self.show_expense_details)
 
     def create_categories_tab(self):
         """Create expense categories management view"""
@@ -640,9 +644,9 @@ class ExpenseScreen(ttk.Frame):
                 category_id=category_id
             )
 
-            # Add expenses to treeview (ID first — hidden column)
-            for expense in expenses:
-                self.expenses_tree.insert("", "end", values=(
+            for i, expense in enumerate(expenses):
+                tag = 'odd' if i % 2 == 0 else 'even'
+                self.expenses_tree.insert("", "end", tags=(tag,), values=(
                     expense['id'],
                     expense['date'],
                     expense['category'],

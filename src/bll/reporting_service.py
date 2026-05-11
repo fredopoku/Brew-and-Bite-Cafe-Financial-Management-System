@@ -17,9 +17,9 @@ except ImportError:
     REPORTLAB_AVAILABLE = False
 
 # Local imports
-from src.services.sales_service import SalesService
-from src.services.expense_service import ExpenseService
-from src.services.inventory_service import InventoryService
+from src.bll.sales_service import SalesService
+from src.bll.expense_service import ExpenseService
+from src.bll.inventory_service import InventoryService
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +89,47 @@ class ReportingService:
 
         except Exception as e:
             logger.error(f"Failed to generate daily report: {str(e)}")
+            raise
+
+    def generate_periodic_report(self, start_date: str, end_date: str,
+                                  group_by: str = 'day') -> Dict:
+        """Generate a report for a date range"""
+        try:
+            for d in [start_date, end_date]:
+                valid, err = validate_date(d)
+                if not valid:
+                    raise ValueError(err)
+
+            sales_report = self.sales_service.get_sales_report(start_date, end_date, group_by)
+            expense_summary = self.expense_service.get_expense_summary(start_date, end_date)
+
+            total_sales = sales_report['summary']['total_revenue']
+            total_transactions = sales_report['summary']['total_transactions']
+            total_expenses = expense_summary['summary']['total_amount']
+
+            return {
+                'period': {'start_date': start_date, 'end_date': end_date},
+                'overview': {
+                    'total_sales': total_sales,
+                    'total_expenses': total_expenses,
+                    'net_income': total_sales - total_expenses,
+                    'total_transactions': total_transactions
+                },
+                'sales_analysis': {
+                    'over_time': sales_report['sales_over_time']
+                },
+                'expenses': expense_summary['by_category']
+            }
+        except Exception as e:
+            logger.error(f"Failed to generate periodic report: {str(e)}")
+            raise
+
+    def generate_inventory_report(self) -> Dict:
+        """Generate inventory status report"""
+        try:
+            return self.inventory_service.get_inventory_status()
+        except Exception as e:
+            logger.error(f"Failed to generate inventory report: {str(e)}")
             raise
 
     def export_report(self, report_type: str, start_date: str,
@@ -195,36 +236,35 @@ class ReportingService:
 
             activities = []
 
-            # Get recent sales
-            sales = self.sales_service.get_sales_by_date_range(
-                start_date=start_date.strftime('%Y-%m-%d'),
-                end_date=end_date.strftime('%Y-%m-%d')
+            # Get recent sales via DAO
+            sales = self.sales_service.sale_dao.get_sales_by_date_range(
+                start_date=start_date.date(),
+                end_date=end_date.date()
             )
 
-            # Get recent expenses
-            expenses = self.expense_service.get_expenses_by_date_range(
-                start_date=start_date.strftime('%Y-%m-%d'),
-                end_date=end_date.strftime('%Y-%m-%d')
+            # Get recent expenses via DAO
+            expenses = self.expense_service.expense_dao.get_expenses_by_date_range(
+                start_date=start_date.date(),
+                end_date=end_date.date()
             )
 
-            # Combine and process activities
             for sale in sales:
                 activities.append({
-                    'timestamp': sale['date'],
+                    'timestamp': sale.date,
                     'type': 'SALE',
-                    'amount': sale['total_amount'],
-                    'details': f"Sale #{sale['id']} - {len(sale['items'])} items"
+                    'amount': float(sale.total_amount),
+                    'details': f"Sale #{sale.id} - {len(sale.sale_items)} items"
                 })
 
             for expense in expenses:
+                category_name = expense.category.name if expense.category else 'Unknown'
                 activities.append({
-                    'timestamp': expense['date'],
+                    'timestamp': expense.date,
                     'type': 'EXPENSE',
-                    'amount': expense['amount'],
-                    'details': f"{expense['category']} - {expense['description']}"
+                    'amount': float(expense.amount),
+                    'details': f"{category_name} - {expense.description or ''}"
                 })
 
-            # Sort by timestamp and limit results
             activities.sort(key=lambda x: x['timestamp'], reverse=True)
             return activities[:limit]
 

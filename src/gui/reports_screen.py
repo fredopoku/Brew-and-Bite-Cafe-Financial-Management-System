@@ -42,55 +42,78 @@ class ReportsScreen(ttk.Frame):
         self.load_initial_data()
 
     def create_widgets(self):
-        """Create and arrange widgets"""
         bg = CREAM if _HAS_STYLES else "#f0f0f0"
 
-        # Header bar
-        heading_frame = tk.Frame(self, bg=bg, pady=12)
-        heading_frame.pack(fill="x", padx=20)
+        # Page header
+        hdr = tk.Frame(self, bg=bg)
+        hdr.pack(fill="x")
+        tk.Frame(hdr, bg=MEDIUM_BROWN if _HAS_STYLES else "#8B5E3C", height=3).pack(fill="x")
 
-        tk.Label(
-            heading_frame, text="Reports & Analytics",
-            font=FONT_H2 if _HAS_STYLES else ("Helvetica", 16, "bold"),
-            bg=bg, fg=ESPRESSO if _HAS_STYLES else "black"
-        ).pack(side="left")
+        inner_hdr = tk.Frame(hdr, bg=bg, pady=14, padx=24)
+        inner_hdr.pack(fill="x")
 
-        bg = CREAM if _HAS_STYLES else "#f0f0f0"
+        title_col = tk.Frame(inner_hdr, bg=bg)
+        title_col.pack(side="left")
+        tk.Label(title_col, text="📊  Reports & Analytics",
+                 font=("Helvetica", 18, "bold"),
+                 bg=bg, fg=ESPRESSO if _HAS_STYLES else "black").pack(anchor="w")
+        tk.Label(title_col, text="Generate and export financial reports",
+                 font=("Helvetica", 9),
+                 bg=bg, fg=TEXT_MID if _HAS_STYLES else "#555").pack(anchor="w", pady=(2, 0))
+
+        export_btn = tk.Button(inner_hdr, text="  Export CSV  ",
+                               font=("Helvetica", 10),
+                               bg=CARD_BG if _HAS_STYLES else "white",
+                               fg=MEDIUM_BROWN if _HAS_STYLES else "#8B5E3C",
+                               activebackground=BORDER if _HAS_STYLES else "#ccc",
+                               relief="flat", bd=0, cursor="hand2",
+                               highlightbackground=BORDER if _HAS_STYLES else "#ccc",
+                               highlightthickness=1,
+                               command=self.export_report)
+        export_btn.pack(side="right", ipady=8)
+
+        tk.Frame(hdr, bg=BORDER if _HAS_STYLES else "#ccc", height=1).pack(fill="x")
 
         # Controls bar
-        controls_frame = tk.Frame(self, bg=bg)
-        controls_frame.pack(fill="x", padx=20, pady=(0, 8))
+        ctrl = tk.Frame(self, bg=CARD_BG if _HAS_STYLES else "white",
+                        pady=10, padx=16,
+                        highlightbackground=BORDER if _HAS_STYLES else "#ccc",
+                        highlightthickness=1)
+        ctrl.pack(fill="x", padx=12, pady=(8, 4))
 
-        tk.Label(controls_frame, text="Report:",
-                 font=FONT_SMALL if _HAS_STYLES else ("Helvetica", 10),
-                 bg=bg).pack(side="left", padx=(0, 4))
+        tk.Label(ctrl, text="Report Type",
+                 font=("Helvetica", 9, "bold"),
+                 bg=CARD_BG if _HAS_STYLES else "white",
+                 fg=TEXT_MID if _HAS_STYLES else "#555").pack(side="left")
         report_types = ["Daily Sales", "Monthly Sales", "Product Performance"]
-        report_combo = ttk.Combobox(
-            controls_frame, textvariable=self.report_type_var,
-            values=report_types, state="readonly", width=22
-        )
-        report_combo.pack(side="left", padx=(0, 14))
+        report_combo = ttk.Combobox(ctrl, textvariable=self.report_type_var,
+                                    values=report_types, state="readonly", width=22)
+        report_combo.pack(side="left", padx=(6, 20))
 
-        tk.Label(controls_frame, text="From:",
-                 font=FONT_SMALL if _HAS_STYLES else ("Helvetica", 10),
-                 bg=bg).pack(side="left", padx=(0, 4))
-        DatePicker(controls_frame, self.start_date_var).pack(side="left", padx=(0, 8))
+        tk.Label(ctrl, text="From",
+                 font=("Helvetica", 9, "bold"),
+                 bg=CARD_BG if _HAS_STYLES else "white",
+                 fg=TEXT_MID if _HAS_STYLES else "#555").pack(side="left")
+        DatePicker(ctrl, self.start_date_var).pack(side="left", padx=(4, 0))
+        tk.Label(ctrl, text="  to",
+                 font=("Helvetica", 9, "bold"),
+                 bg=CARD_BG if _HAS_STYLES else "white",
+                 fg=TEXT_MID if _HAS_STYLES else "#555").pack(side="left")
+        DatePicker(ctrl, self.end_date_var).pack(side="left", padx=(4, 20))
 
-        tk.Label(controls_frame, text="To:",
-                 font=FONT_SMALL if _HAS_STYLES else ("Helvetica", 10),
-                 bg=bg).pack(side="left", padx=(0, 4))
-        DatePicker(controls_frame, self.end_date_var).pack(side="left", padx=(0, 14))
+        gen_btn = tk.Button(ctrl, text="  Generate Report  ",
+                            font=("Helvetica", 10, "bold"),
+                            bg=MEDIUM_BROWN if _HAS_STYLES else "#8B5E3C",
+                            fg="white",
+                            activebackground=DARK_BROWN if _HAS_STYLES else "#4A2C17",
+                            activeforeground="white",
+                            relief="flat", bd=0, cursor="hand2",
+                            command=self.generate_report)
+        gen_btn.pack(side="left", ipady=6)
 
-        ttk.Button(controls_frame, text="Generate",
-                   style="Primary.TButton" if _HAS_STYLES else "TButton",
-                   command=self.generate_report).pack(side="left", padx=(0, 6))
-        ttk.Button(controls_frame, text="Export PDF",
-                   style="Secondary.TButton" if _HAS_STYLES else "TButton",
-                   command=self.export_report).pack(side="left")
-
-        # Scrollable report display area
+        # Report display area
         outer = tk.Frame(self, bg=bg)
-        outer.pack(fill="both", expand=True, padx=10, pady=5)
+        outer.pack(fill="both", expand=True, padx=12, pady=4)
         self.report_frame = ttk.Frame(outer)
         self.report_frame.pack(fill="both", expand=True)
 

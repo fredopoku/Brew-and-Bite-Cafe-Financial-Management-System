@@ -6,7 +6,7 @@ from datetime import datetime
 import os
 
 from src.config import DATABASE_URL
-from src.models import Base, User, Category, InventoryItem, UserRole
+from src.database.models import Base, User, Category, InventoryItem, UserRole
 from src.utils.security import hash_password
 
 logger = logging.getLogger(__name__)

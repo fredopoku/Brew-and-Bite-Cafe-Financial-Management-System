@@ -70,18 +70,8 @@ class BrewAndBiteApp:
     def start_gui(self):
         """Initialize and start the GUI"""
         try:
-            root = tk.Tk()
-            root.withdraw()  # Hide the root window
-
-            # Set application title
-            root.title(APP_NAME)
-
-            # Center the login window
-            login_window = LoginWindow(root)
-
-            # Start the application main loop
-            root.mainloop()
-
+            login_window = LoginWindow()
+            login_window.run()
         except Exception as e:
             self.logger.error(f"GUI initialization failed: {str(e)}")
             raise

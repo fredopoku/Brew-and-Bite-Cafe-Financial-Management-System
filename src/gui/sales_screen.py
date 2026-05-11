@@ -31,28 +31,39 @@ class SalesScreen(ttk.Frame):
         self.load_data()
 
     def create_widgets(self):
-        """Create and arrange widgets"""
         bg = CREAM if _HAS_STYLES else "#f0f0f0"
 
-        # Header bar
-        heading_frame = tk.Frame(self, bg=bg, pady=12)
-        heading_frame.pack(fill="x", padx=20)
+        # Page header
+        hdr = tk.Frame(self, bg=bg)
+        hdr.pack(fill="x")
+        tk.Frame(hdr, bg=MEDIUM_BROWN if _HAS_STYLES else "#8B5E3C", height=3).pack(fill="x")
 
-        tk.Label(
-            heading_frame, text="Sales Management",
-            font=FONT_H2 if _HAS_STYLES else ("Helvetica", 16, "bold"),
-            bg=bg, fg=ESPRESSO if _HAS_STYLES else "black"
-        ).pack(side="left")
+        inner_hdr = tk.Frame(hdr, bg=bg, pady=14, padx=24)
+        inner_hdr.pack(fill="x")
 
-        ttk.Button(
-            heading_frame, text="+ New Sale",
-            style="Primary.TButton" if _HAS_STYLES else "TButton",
-            command=self.show_new_sale_dialog
-        ).pack(side="right")
+        title_col = tk.Frame(inner_hdr, bg=bg)
+        title_col.pack(side="left")
+        tk.Label(title_col, text="🛍  Sales Management",
+                 font=("Helvetica", 18, "bold"),
+                 bg=bg, fg=ESPRESSO if _HAS_STYLES else "black").pack(anchor="w")
+        tk.Label(title_col, text="Manage transactions and view sales history",
+                 font=("Helvetica", 9),
+                 bg=bg, fg=TEXT_MID if _HAS_STYLES else "#555").pack(anchor="w", pady=(2, 0))
 
-        # Create notebook for different views
+        new_sale_btn = tk.Button(inner_hdr, text="  + New Sale  ",
+                                 font=("Helvetica", 10, "bold"),
+                                 bg=MEDIUM_BROWN if _HAS_STYLES else "#8B5E3C",
+                                 fg="white",
+                                 activebackground=DARK_BROWN if _HAS_STYLES else "#4A2C17",
+                                 activeforeground="white",
+                                 relief="flat", bd=0, cursor="hand2",
+                                 command=self.show_new_sale_dialog)
+        new_sale_btn.pack(side="right", ipady=8)
+
+        tk.Frame(hdr, bg=BORDER if _HAS_STYLES else "#ccc", height=1).pack(fill="x")
+
         self.notebook = ttk.Notebook(self)
-        self.notebook.pack(fill="both", expand=True, padx=10, pady=5)
+        self.notebook.pack(fill="both", expand=True, padx=12, pady=8)
 
         # Create tabs
         self.create_active_sales_tab()

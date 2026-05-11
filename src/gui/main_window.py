@@ -101,95 +101,124 @@ class MainWindow:
         help_menu.add_command(label="About",       command=self.show_about)
 
     def create_sidebar(self):
-        self.sidebar = tk.Frame(self.root, bg=ESPRESSO, width=220)
+        self.sidebar = tk.Frame(self.root, bg=ESPRESSO, width=230)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         self.sidebar.grid_propagate(False)
 
-        # --- Logo / branding area ---
-        brand_frame = tk.Frame(self.sidebar, bg=DARK_BROWN, pady=20)
-        brand_frame.pack(fill="x")
+        # --- Brand area ---
+        brand = tk.Frame(self.sidebar, bg=DARK_BROWN)
+        brand.pack(fill="x")
+        inner_brand = tk.Frame(brand, bg=DARK_BROWN, pady=18, padx=18)
+        inner_brand.pack(fill="x")
+        top_row = tk.Frame(inner_brand, bg=DARK_BROWN)
+        top_row.pack(fill="x")
+        icon_box = tk.Frame(top_row, bg=ESPRESSO, width=44, height=44)
+        icon_box.pack(side="left")
+        icon_box.pack_propagate(False)
+        tk.Label(icon_box, text="☕", font=("Helvetica", 22),
+                 bg=ESPRESSO, fg=CARD_BG).place(relx=0.5, rely=0.5, anchor="center")
+        name_col = tk.Frame(top_row, bg=DARK_BROWN)
+        name_col.pack(side="left", padx=(10, 0))
+        tk.Label(name_col, text="Brew & Bite",
+                 font=("Helvetica", 14, "bold"),
+                 bg=DARK_BROWN, fg=CARD_BG).pack(anchor="w")
+        tk.Label(name_col, text="Café Management",
+                 font=("Helvetica", 8),
+                 bg=DARK_BROWN, fg=LIGHT_BROWN).pack(anchor="w")
 
-        tk.Label(brand_frame, text="☕", font=("Helvetica", 28),
-                 bg=DARK_BROWN, fg=CARD_BG).pack()
-        tk.Label(brand_frame, text="Brew & Bite",
-                 font=("Helvetica", 16, "bold"),
-                 bg=DARK_BROWN, fg=CARD_BG).pack()
-        tk.Label(brand_frame, text="Café Management",
-                 font=("Helvetica", 9),
-                 bg=DARK_BROWN, fg=LIGHT_BROWN).pack()
-
-        # --- User card ---
-        user_frame = tk.Frame(self.sidebar, bg=ESPRESSO, pady=12)
-        user_frame.pack(fill="x", padx=14)
-
-        tk.Label(user_frame, text=self.user_data['username'].upper(),
-                 font=("Helvetica", 11, "bold"),
-                 bg=ESPRESSO, fg=CARD_BG).pack(anchor="w")
-        role_colour = LIGHT_BROWN if self.user_data['role'] == UserRole.ADMIN.value else "#7DB0A0"
-        tk.Label(user_frame, text=f"  {self.user_data['role']}",
-                 font=("Helvetica", 9), bg=ESPRESSO, fg=role_colour).pack(anchor="w")
-
-        # divider
-        tk.Frame(self.sidebar, bg=DARK_BROWN, height=1).pack(fill="x", padx=10, pady=6)
-
-        # --- Nav label ---  use SIDEBAR_MUTED (5.5:1 on ESPRESSO) not TEXT_LIGHT
-        tk.Label(self.sidebar, text="NAVIGATION",
+        # --- Nav section label ---
+        tk.Frame(self.sidebar, bg=DARK_BROWN, height=1).pack(fill="x")
+        tk.Label(self.sidebar, text="  MAIN MENU",
                  font=("Helvetica", 8, "bold"),
-                 bg=ESPRESSO, fg=SIDEBAR_MUTED).pack(anchor="w", padx=18, pady=(6, 2))
+                 bg=ESPRESSO, fg=SIDEBAR_MUTED).pack(anchor="w", padx=14, pady=(14, 4))
 
-        # --- Nav labels (tk.Label instead of tk.Button — macOS ignores Button bg/fg) ---
+        # --- Nav items with left-border indicator ---
         self._nav_buttons = {}
+        self._nav_rows    = {}
         nav_items = [
-            ("dashboard", "  Dashboard",   self.load_dashboard),
-            ("sales",     "  Sales",       self.load_sales),
-            ("inventory", "  Inventory",   self.load_inventory),
-            ("expenses",  "  Expenses",    self.load_expenses),
-            ("reports",   "  Reports",     self.load_reports),
+            ("dashboard", "🏠", "Dashboard",      self.load_dashboard),
+            ("sales",     "🛍", "Sales",           self.load_sales),
+            ("inventory", "📦", "Inventory",       self.load_inventory),
+            ("expenses",  "💳", "Expenses",        self.load_expenses),
+            ("reports",   "📊", "Reports",         self.load_reports),
         ]
         if self.user_data['role'] == UserRole.ADMIN.value:
-            nav_items.append(("users", "  User Management", self.load_user_management))
+            nav_items.append(("users", "👥", "User Management", self.load_user_management))
 
-        for key, label, cmd in nav_items:
-            lbl = tk.Label(
-                self.sidebar, text=label,
-                font=FONT_BODY, anchor="w",
-                bg=ESPRESSO, fg=SIDEBAR_TEXT,
-                cursor="hand2", pady=10, padx=8
-            )
-            lbl.pack(fill="x", padx=8, pady=1)
-            lbl.bind("<Button-1>", lambda e, k=key, c=cmd: self._nav_click(k, c))
-            lbl.bind("<Enter>",    lambda e, l=lbl, k=key: self._nav_hover(l, k, True))
-            lbl.bind("<Leave>",    lambda e, l=lbl, k=key: self._nav_hover(l, k, False))
-            self._nav_buttons[key] = lbl
+        for key, icon, label, cmd in nav_items:
+            row = tk.Frame(self.sidebar, bg=ESPRESSO, cursor="hand2")
+            row.pack(fill="x", pady=1)
 
-        # --- Bottom: logout ---
-        tk.Frame(self.sidebar, bg=DARK_BROWN, height=1).pack(fill="x", padx=10, pady=10)
-        logout_lbl = tk.Label(
-            self.sidebar, text="  Logout",
-            font=FONT_SMALL, anchor="w",
-            bg=ESPRESSO, fg=SIDEBAR_TEXT,
-            cursor="hand2", pady=8, padx=8
-        )
-        logout_lbl.pack(fill="x", padx=8, pady=1)
-        logout_lbl.bind("<Button-1>", lambda e: self.logout())
-        logout_lbl.bind("<Enter>", lambda e: logout_lbl.configure(bg=DANGER, fg=CARD_BG))
-        logout_lbl.bind("<Leave>", lambda e: logout_lbl.configure(bg=ESPRESSO, fg=SIDEBAR_TEXT))
+            indicator = tk.Frame(row, bg=ESPRESSO, width=4)
+            indicator.pack(side="left", fill="y")
+
+            content = tk.Frame(row, bg=ESPRESSO, pady=10)
+            content.pack(side="left", fill="x", expand=True, padx=(8, 12))
+
+            tk.Label(content, text=f"{icon}  {label}",
+                     font=FONT_BODY, anchor="w",
+                     bg=ESPRESSO, fg=SIDEBAR_TEXT).pack(fill="x")
+
+            self._nav_buttons[key] = (row, indicator, content)
+
+            for widget in (row, content) + tuple(content.winfo_children()):
+                widget.bind("<Button-1>", lambda e, k=key, c=cmd: self._nav_click(k, c))
+                widget.bind("<Enter>",    lambda e, k=key: self._nav_hover(k, True))
+                widget.bind("<Leave>",    lambda e, k=key: self._nav_hover(k, False))
+
+        # --- Bottom: divider + user card + logout ---
+        tk.Frame(self.sidebar, bg=DARK_BROWN, height=1).pack(
+            fill="x", padx=14, pady=(14, 0), side="bottom")
+
+        bottom = tk.Frame(self.sidebar, bg=ESPRESSO, pady=14, padx=14)
+        bottom.pack(side="bottom", fill="x")
+
+        role_colour = LIGHT_BROWN if self.user_data['role'] == UserRole.ADMIN.value else "#7DB0A0"
+        initials = self.user_data['username'][:2].upper()
+        avatar = tk.Frame(bottom, bg=MEDIUM_BROWN, width=36, height=36)
+        avatar.pack(side="left")
+        avatar.pack_propagate(False)
+        tk.Label(avatar, text=initials, font=("Helvetica", 12, "bold"),
+                 bg=MEDIUM_BROWN, fg=CARD_BG).place(relx=0.5, rely=0.5, anchor="center")
+
+        info = tk.Frame(bottom, bg=ESPRESSO)
+        info.pack(side="left", padx=(10, 0))
+        tk.Label(info, text=self.user_data['username'],
+                 font=("Helvetica", 10, "bold"),
+                 bg=ESPRESSO, fg=CARD_BG).pack(anchor="w")
+        tk.Label(info, text=self.user_data['role'],
+                 font=("Helvetica", 8),
+                 bg=ESPRESSO, fg=role_colour).pack(anchor="w")
+
+        logout_btn = tk.Label(bottom, text="⏻", font=("Helvetica", 16),
+                              bg=ESPRESSO, fg=SIDEBAR_MUTED, cursor="hand2")
+        logout_btn.pack(side="right")
+        logout_btn.bind("<Button-1>", lambda _: self.logout())
+        logout_btn.bind("<Enter>", lambda _: logout_btn.configure(fg=DANGER))
+        logout_btn.bind("<Leave>", lambda _: logout_btn.configure(fg=SIDEBAR_MUTED))
 
     def _nav_click(self, key: str, command):
-        for k, lbl in self._nav_buttons.items():
-            lbl.configure(bg=ESPRESSO, fg=SIDEBAR_TEXT, font=FONT_BODY)
-        if key in self._nav_buttons:
-            self._nav_buttons[key].configure(
-                bg=MEDIUM_BROWN, fg=CARD_BG, font=("Helvetica", 11, "bold")
-            )
+        for k, (row, ind, cont) in self._nav_buttons.items():
+            is_active = (k == key)
+            bg = DARK_BROWN if is_active else ESPRESSO
+            ind.configure(bg=MEDIUM_BROWN if is_active else ESPRESSO)
+            row.configure(bg=bg)
+            cont.configure(bg=bg)
+            for child in cont.winfo_children():
+                child.configure(bg=bg,
+                                fg=CARD_BG if is_active else SIDEBAR_TEXT,
+                                font=("Helvetica", 11, "bold") if is_active else FONT_BODY)
         self._active_nav = key
         command()
 
-    def _nav_hover(self, label: tk.Label, key: str, entering: bool):
+    def _nav_hover(self, key: str, entering: bool):
         if key == self._active_nav:
             return
-        label.configure(bg=DARK_BROWN if entering else ESPRESSO,
-                        fg=CARD_BG if entering else SIDEBAR_TEXT)
+        row, ind, cont = self._nav_buttons[key]
+        bg = DARK_BROWN if entering else ESPRESSO
+        row.configure(bg=bg); cont.configure(bg=bg)
+        for child in cont.winfo_children():
+            child.configure(bg=bg)
 
     def create_main_content(self):
         self.main_content = tk.Frame(self.root, bg=CREAM)
@@ -198,16 +227,16 @@ class MainWindow:
         self.main_content.grid_columnconfigure(0, weight=1)
 
     def create_status_bar(self):
-        bar = tk.Frame(self.root, bg=DARK_BROWN, height=26)
+        bar = tk.Frame(self.root, bg=ESPRESSO, height=28)
         bar.grid(row=1, column=0, columnspan=2, sticky="ew")
         bar.grid_propagate(False)
 
-        tk.Label(bar, text="  Brew & Bite Café Management System  v1.0",
-                 font=("Helvetica", 9), bg=DARK_BROWN, fg=LIGHT_BROWN).pack(side="left")
+        tk.Label(bar, text="  ☕  Brew & Bite Café  ·  Management System  v1.0",
+                 font=("Helvetica", 9), bg=ESPRESSO, fg=SIDEBAR_MUTED).pack(side="left")
 
         self.time_label = tk.Label(bar, font=("Helvetica", 9),
-                                   bg=DARK_BROWN, fg=LIGHT_BROWN)
-        self.time_label.pack(side="right", padx=10)
+                                   bg=ESPRESSO, fg=SIDEBAR_MUTED)
+        self.time_label.pack(side="right", padx=12)
         self.update_time()
 
     # ------------------------------------------------------------------
@@ -237,22 +266,36 @@ class MainWindow:
         )
 
         outer = tk.Frame(self.main_content, bg=CREAM)
-        outer.pack(fill="both", expand=True, padx=24, pady=18)
+        outer.pack(fill="both", expand=True, padx=28, pady=20)
 
         # ---- Page header ----
         ph = tk.Frame(outer, bg=CREAM)
-        ph.pack(fill="x", pady=(0, 14))
-        tk.Label(ph, text="Dashboard",
-                 font=FONT_H1, bg=CREAM, fg=ESPRESSO).pack(side="left")
-        tk.Label(ph, text=today.strftime("  %A, %d %B %Y"),
-                 font=FONT_SMALL, bg=CREAM, fg=TEXT_MID).pack(side="left", pady=(6, 0))
+        ph.pack(fill="x", pady=(0, 16))
 
-        ttk.Button(ph, text="+ New Sale",
-                   style="Primary.TButton",
-                   command=self.load_sales).pack(side="right", padx=(6, 0))
-        ttk.Button(ph, text="+ Expense",
-                   style="Secondary.TButton",
-                   command=self.load_expenses).pack(side="right")
+        left_hdr = tk.Frame(ph, bg=CREAM)
+        left_hdr.pack(side="left")
+        tk.Label(left_hdr, text="Dashboard",
+                 font=("Helvetica", 22, "bold"), bg=CREAM, fg=ESPRESSO).pack(anchor="w")
+        tk.Label(left_hdr, text=today.strftime("%A, %d %B %Y"),
+                 font=FONT_SMALL, bg=CREAM, fg=TEXT_MID).pack(anchor="w", pady=(2, 0))
+
+        btn_frame = tk.Frame(ph, bg=CREAM)
+        btn_frame.pack(side="right")
+        new_sale = tk.Button(btn_frame, text="  + New Sale  ",
+                             font=("Helvetica", 10, "bold"),
+                             bg=MEDIUM_BROWN, fg=CARD_BG,
+                             activebackground=DARK_BROWN, activeforeground=CARD_BG,
+                             relief="flat", bd=0, cursor="hand2",
+                             command=self.load_sales)
+        new_sale.pack(side="right", ipady=7, ipadx=2)
+        new_expense = tk.Button(btn_frame, text="  + Expense  ",
+                                font=("Helvetica", 10),
+                                bg=CARD_BG, fg=MEDIUM_BROWN,
+                                activebackground=BORDER, activeforeground=ESPRESSO,
+                                relief="flat", bd=0, cursor="hand2",
+                                highlightbackground=BORDER, highlightthickness=1,
+                                command=self.load_expenses)
+        new_expense.pack(side="right", ipady=7, ipadx=2, padx=(0, 8))
 
         # ---- KPI cards ----
         cards_row = tk.Frame(outer, bg=CREAM)
@@ -300,10 +343,13 @@ class MainWindow:
                               highlightbackground=BORDER, highlightthickness=1)
         chart_card.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
 
-        ch_hdr = tk.Frame(chart_card, bg=CREAM)
-        ch_hdr.pack(fill="x", padx=14, pady=(10, 4))
-        tk.Label(ch_hdr, text="Sales — Last 7 Days",
-                 font=FONT_H3, bg=CREAM, fg=ESPRESSO).pack(side="left")
+        ch_hdr = tk.Frame(chart_card, bg=CARD_BG)
+        ch_hdr.pack(fill="x", padx=16, pady=(14, 4))
+        tk.Label(ch_hdr, text="📈  Sales — Last 7 Days",
+                 font=("Helvetica", 11, "bold"), bg=CARD_BG, fg=ESPRESSO).pack(side="left")
+        tk.Label(ch_hdr, text=f"{week_start}  →  {today_str}",
+                 font=("Helvetica", 8), bg=CARD_BG, fg=TEXT_MID).pack(side="right")
+        tk.Frame(chart_card, bg=BORDER, height=1).pack(fill="x", padx=16)
 
         from src.gui.charts import BarChart
         chart = BarChart(chart_card, bar_color=MEDIUM_BROWN)
@@ -328,46 +374,45 @@ class MainWindow:
                             highlightbackground=BORDER, highlightthickness=1)
         act_card.grid(row=0, column=1, sticky="nsew")
 
-        act_hdr = tk.Frame(act_card, bg=CREAM)
-        act_hdr.pack(fill="x", padx=14, pady=(10, 6))
-        tk.Label(act_hdr, text="Recent Activity",
-                 font=FONT_H3, bg=CREAM, fg=ESPRESSO).pack(side="left")
+        act_hdr = tk.Frame(act_card, bg=CARD_BG)
+        act_hdr.pack(fill="x", padx=16, pady=(14, 4))
+        tk.Label(act_hdr, text="🕐  Recent Activity",
+                 font=("Helvetica", 11, "bold"), bg=CARD_BG, fg=ESPRESSO).pack(side="left")
+        tk.Frame(act_card, bg=BORDER, height=1).pack(fill="x", padx=16)
 
         act_scroll = tk.Frame(act_card, bg=CARD_BG)
-        act_scroll.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        act_scroll.pack(fill="both", expand=True, padx=12, pady=(6, 10))
 
         try:
             activities = self.services['reporting'].get_recent_activities()
             if not activities:
                 tk.Label(act_scroll, text="No activity recorded yet.",
                          bg=CARD_BG, fg=TEXT_MID,
-                         font=FONT_SMALL).pack(pady=20)
+                         font=FONT_SMALL).pack(pady=30)
             else:
-                for act in activities[:14]:
-                    row_bg = CARD_BG
-                    row = tk.Frame(act_scroll, bg=row_bg,
-                                   highlightbackground=BORDER, highlightthickness=0)
-                    row.pack(fill="x", pady=1)
+                for i, act in enumerate(activities[:14]):
+                    row_bg = "#F9F5F0" if i % 2 == 0 else CARD_BG
+                    row = tk.Frame(act_scroll, bg=row_bg, pady=5, padx=6)
+                    row.pack(fill="x")
 
                     tk.Label(row, text=act['timestamp'].strftime("%H:%M"),
-                             font=("Courier", 9), bg=row_bg, fg=TEXT_MID,
-                             width=6, anchor="w").pack(side="left")
+                             font=("Courier", 8), bg=row_bg, fg=TEXT_MID,
+                             width=5, anchor="w").pack(side="left")
 
-                    type_color = MEDIUM_BROWN if act['type'] == 'SALE' else WARNING
-                    tk.Label(row, text=act['type'],
-                             font=("Helvetica", 9, "bold"), bg=row_bg,
-                             fg=type_color, width=9, anchor="w").pack(side="left")
+                    badge_bg = MEDIUM_BROWN if act['type'] == 'SALE' else "#C87030"
+                    badge = tk.Label(row, text=f" {act['type'][:4]} ",
+                                     font=("Helvetica", 8, "bold"),
+                                     bg=badge_bg, fg=CARD_BG)
+                    badge.pack(side="left", padx=(4, 6))
+
+                    tk.Label(row, text=act['details'][:22],
+                             font=("Helvetica", 9), bg=row_bg,
+                             fg=TEXT_DARK, anchor="w").pack(side="left", fill="x", expand=True)
 
                     amt_color = SUCCESS if act['type'] == 'SALE' else DANGER
-                    tk.Label(row,
-                             text=f"${act['amount']:,.2f}",
-                             font=("Helvetica", 9), bg=row_bg,
-                             fg=amt_color, anchor="e", width=10).pack(side="right")
-
-                    tk.Label(row,
-                             text=act['details'][:28],
-                             font=("Helvetica", 9), bg=row_bg,
-                             fg=TEXT_DARK, anchor="w").pack(side="left", fill="x")
+                    tk.Label(row, text=f"${act['amount']:,.2f}",
+                             font=("Helvetica", 9, "bold"), bg=row_bg,
+                             fg=amt_color, anchor="e").pack(side="right")
         except Exception as e:
             logger.warning(f"Activity feed error: {e}")
             tk.Label(act_scroll, text="Could not load activity.",
@@ -398,25 +443,29 @@ class MainWindow:
     def _make_stat_card(self, parent, title, value, subtitle, colour, icon, col):
         card = tk.Frame(parent, bg=CARD_BG,
                         highlightbackground=BORDER, highlightthickness=1)
-        card.grid(row=0, column=col, padx=6, pady=4, sticky="nsew")
+        card.grid(row=0, column=col, padx=5, pady=4, sticky="nsew")
 
-        # Colour accent bar at top
-        tk.Frame(card, bg=colour, height=4).pack(fill="x")
+        body = tk.Frame(card, bg=CARD_BG)
+        body.pack(fill="both", expand=True)
 
-        inner = tk.Frame(card, bg=CARD_BG, padx=14, pady=12)
-        inner.pack(fill="both", expand=True)
+        # Left colour accent bar
+        tk.Frame(body, bg=colour, width=5).pack(side="left", fill="y")
 
-        top = tk.Frame(inner, bg=CARD_BG)
-        top.pack(fill="x")
-        # Use TEXT_MID (6.5:1 on white) instead of TEXT_LIGHT (2.7:1) for legibility
-        tk.Label(top, text=title, font=FONT_SMALL,
+        content = tk.Frame(body, bg=CARD_BG, padx=14, pady=14)
+        content.pack(side="left", fill="both", expand=True)
+
+        top_row = tk.Frame(content, bg=CARD_BG)
+        top_row.pack(fill="x")
+        tk.Label(top_row, text=title, font=("Helvetica", 9),
                  bg=CARD_BG, fg=TEXT_MID).pack(side="left")
-        tk.Label(top, text=icon, font=("Helvetica", 16),
+        tk.Label(top_row, text=icon, font=("Helvetica", 18),
                  bg=CARD_BG).pack(side="right")
 
-        tk.Label(inner, text=value, font=("Helvetica", 22, "bold"),
-                 bg=CARD_BG, fg=colour).pack(anchor="w", pady=(4, 0))
-        tk.Label(inner, text=subtitle, font=FONT_SMALL,
+        tk.Label(content, text=value,
+                 font=("Helvetica", 24, "bold"),
+                 bg=CARD_BG, fg=colour).pack(anchor="w", pady=(6, 2))
+        tk.Label(content, text=subtitle,
+                 font=("Helvetica", 9),
                  bg=CARD_BG, fg=TEXT_MID).pack(anchor="w")
 
     # ------------------------------------------------------------------
