@@ -58,7 +58,7 @@ class LoginWindow:
         icon_frame = tk.Frame(panel, bg=DARK_BROWN, width=90, height=90)
         icon_frame.pack()
         icon_frame.pack_propagate(False)
-        tk.Label(icon_frame, text="B&B", font=("Helvetica", 20, "bold"),
+        tk.Label(icon_frame, text="☕", font=("Helvetica", 44),
                  bg=DARK_BROWN, fg=CARD_BG).place(relx=0.5, rely=0.5, anchor="center")
 
         tk.Frame(panel, bg=ESPRESSO, height=18).pack()

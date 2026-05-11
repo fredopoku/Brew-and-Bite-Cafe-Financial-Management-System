@@ -121,7 +121,7 @@ class MainWindow:
         icon_box = tk.Frame(top_row, bg=ESPRESSO, width=44, height=44)
         icon_box.pack(side="left")
         icon_box.pack_propagate(False)
-        tk.Label(icon_box, text="B&B", font=("Helvetica", 12, "bold"),
+        tk.Label(icon_box, text="☕", font=("Helvetica", 22),
                  bg=ESPRESSO, fg=CARD_BG).place(relx=0.5, rely=0.5, anchor="center")
         name_col = tk.Frame(top_row, bg=DARK_BROWN)
         name_col.pack(side="left", padx=(10, 0))
@@ -237,7 +237,7 @@ class MainWindow:
         bar.grid(row=1, column=0, columnspan=2, sticky="ew")
         bar.grid_propagate(False)
 
-        tk.Label(bar, text="  Brew & Bite  ·  Management System  v1.0",
+        tk.Label(bar, text="  ☕  Brew & Bite  ·  Management System  v1.0",
                  font=("Helvetica", 9), bg=ESPRESSO, fg=SIDEBAR_MUTED).pack(side="left")
 
         self.time_label = tk.Label(bar, font=("Helvetica", 9),
